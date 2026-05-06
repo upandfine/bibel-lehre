@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Check,
@@ -8,6 +8,7 @@ import {
   LayoutGrid,
   Pencil,
   RotateCcw,
+  Search,
   Shuffle,
   X,
 } from "lucide-react";
@@ -395,6 +396,37 @@ function SortStep({
 
   const byId = new Map(books.map((b) => [b.id, b]));
 
+  // Inline-Suche zur schnellen Positionierung — Klick auf eine Karte öffnet
+  // die Suche unter ihr; ein Treffer tauscht das gewählte Buch an diese Stelle.
+  const [searchAt, setSearchAt] = useState<number | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  function toggleSearchAt(index: number) {
+    if (searchAt === index) {
+      closeSearch();
+    } else {
+      setSearchAt(index);
+      setSearchTerm("");
+    }
+  }
+
+  function closeSearch() {
+    setSearchAt(null);
+    setSearchTerm("");
+  }
+
+  function pickFromSearch(targetIndex: number, pickedBookId: number) {
+    const fromIndex = userOrder.indexOf(pickedBookId);
+    if (fromIndex === -1 || fromIndex === targetIndex) {
+      closeSearch();
+      return;
+    }
+    const next = [...userOrder];
+    [next[targetIndex], next[fromIndex]] = [next[fromIndex], next[targetIndex]];
+    onChange(next);
+    closeSearch();
+  }
+
   function handleDragEnd(e: DragEndEvent) {
     const { active, over } = e;
     if (!over || active.id === over.id) return;
@@ -408,8 +440,8 @@ function SortStep({
       <BackButton onClick={onBack} />
       <p className="text-sm text-muted-foreground">
         Bringe die {userOrder.length} Bücher in die kanonische Reihenfolge —
-        ziehe sie an den Griff oder wähle sie mit Tab und sortiere mit
-        Pfeiltasten + Leertaste.
+        ziehe sie an den Griff oder klicke auf ein Buch, um an dieser Stelle
+        nach einem anderen zu suchen.
       </p>
 
       <DndContext
@@ -425,12 +457,30 @@ function SortStep({
             {userOrder.map((bookId, index) => {
               const book = byId.get(bookId);
               if (!book) return null;
+              const isSearchActive = searchAt === index;
+              const isOtherDimmed = searchAt !== null && !isSearchActive;
               return (
-                <SortableBookRow
-                  key={bookId}
-                  index={index + 1}
-                  book={book}
-                />
+                <Fragment key={bookId}>
+                  <SortableBookRow
+                    index={index + 1}
+                    book={book}
+                    isSearchActive={isSearchActive}
+                    isDimmed={isOtherDimmed}
+                    onClick={() => toggleSearchAt(index)}
+                  />
+                  {isSearchActive && (
+                    <li>
+                      <SortSearchPanel
+                        books={books}
+                        currentBookId={bookId}
+                        term={searchTerm}
+                        onTermChange={setSearchTerm}
+                        onSelect={(id) => pickFromSearch(index, id)}
+                        onClose={closeSearch}
+                      />
+                    </li>
+                  )}
+                </Fragment>
               );
             })}
           </ol>
@@ -450,9 +500,27 @@ function SortStep({
   );
 }
 
-function SortableBookRow({ book, index }: { book: Book; index: number }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: book.id });
+function SortableBookRow({
+  book,
+  index,
+  isSearchActive,
+  isDimmed,
+  onClick,
+}: {
+  book: Book;
+  index: number;
+  isSearchActive: boolean;
+  isDimmed: boolean;
+  onClick: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: book.id, disabled: isDimmed });
 
   return (
     <li
@@ -462,8 +530,10 @@ function SortableBookRow({ book, index }: { book: Book; index: number }) {
         transition,
       }}
       className={cn(
-        "flex items-center gap-3 rounded-md border bg-card p-2 pr-3",
+        "flex items-center gap-3 rounded-md border bg-card p-2 pr-3 transition-opacity",
         isDragging && "z-10 shadow-md ring-2 ring-foreground/20",
+        isSearchActive && "ring-2 ring-primary",
+        isDimmed && "pointer-events-none opacity-30",
       )}
     >
       <button
@@ -478,8 +548,102 @@ function SortableBookRow({ book, index }: { book: Book; index: number }) {
       <span className="w-7 shrink-0 text-right text-sm tabular-nums text-muted-foreground">
         {index}.
       </span>
-      <BookCardInline book={book} />
+      <button
+        type="button"
+        onClick={onClick}
+        className="-mx-1 flex-1 rounded px-1 py-0.5 text-left hover:bg-accent/50"
+        aria-label={`Suche unter ${book.nameDe} öffnen`}
+      >
+        <BookCardInline book={book} />
+      </button>
     </li>
+  );
+}
+
+function SortSearchPanel({
+  books,
+  currentBookId,
+  term,
+  onTermChange,
+  onSelect,
+  onClose,
+}: {
+  books: Book[];
+  currentBookId: number;
+  term: string;
+  onTermChange: (v: string) => void;
+  onSelect: (bookId: number) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const trimmed = term.trim().toLowerCase();
+  const results = trimmed
+    ? books
+        .filter((b) => b.id !== currentBookId)
+        .filter(
+          (b) =>
+            b.nameDe.toLowerCase().includes(trimmed) ||
+            b.abbr.toLowerCase().includes(trimmed),
+        )
+        .slice(0, 12)
+    : [];
+
+  return (
+    <div className="rounded-md border-2 border-primary bg-card p-3 shadow-sm">
+      <div className="flex items-center gap-2">
+        <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <input
+          type="text"
+          value={term}
+          onChange={(e) => onTermChange(e.target.value)}
+          placeholder={'Buch suchen — z. B. "je", "mose", "1th" …'}
+          // eslint-disable-next-line jsx-a11y/no-autofocus
+          autoFocus
+          autoComplete="off"
+          spellCheck={false}
+          className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+        />
+        <button
+          type="button"
+          onClick={onClose}
+          className="shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+          aria-label="Suche schließen"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {trimmed && (
+        <div className="mt-2.5">
+          {results.length === 0 ? (
+            <p className="text-sm italic text-muted-foreground">
+              Keine Treffer für „{term}".
+            </p>
+          ) : (
+            <ul className="flex flex-wrap gap-1.5">
+              {results.map((book) => (
+                <li key={book.id}>
+                  <button
+                    type="button"
+                    onClick={() => onSelect(book.id)}
+                    className="rounded-md border bg-background px-2.5 py-1 text-sm hover:border-primary hover:bg-accent"
+                  >
+                    {book.nameDe}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -511,8 +675,7 @@ function WriteStep({
       <BackButton onClick={onBack} />
       <p className="text-sm text-muted-foreground">
         Schreibe die {books.length} Bücher der Reihenfolge nach in die Felder.
-        Abkürzungen, Schreibweisen und Originalnamen werden akzeptiert (z.B.
-        „1Mo", „1. Mose" oder „Bereschit").
+        Deutscher Name oder gängige Abkürzung — z. B. „1. Mose" oder „1Mo".
       </p>
 
       <ol className="space-y-1.5">
