@@ -3,6 +3,10 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { TopBar } from "@/components/app-shell/top-bar";
 
+// Alle authentifizierten Routen sind per Definition dynamisch (Cookies, Session,
+// DB-Zugriff). Verhindert dass Next zur Build-Zeit eine DB-Verbindung versucht.
+export const dynamic = "force-dynamic";
+
 export default async function AppLayout({
   children,
 }: {

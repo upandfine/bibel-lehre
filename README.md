@@ -118,15 +118,76 @@ pnpm test:e2e        # Playwright-E2E-Tests
 └── drizzle.config.ts
 ```
 
-## Deployment auf Sliplane (später)
+## Deployment auf Sliplane
 
-1. Repo nach GitHub privat pushen.
-2. In Sliplane neuen Service anlegen, mit GitHub-Repo verbinden.
-3. Service A: Dockerfile-Service, Build aus dem Repo.
-4. Service B: Postgres 16 (Sliplane bietet das als Managed Service).
-5. Umgebungsvariablen in Sliplane setzen (siehe `.env.example`).
-6. Custom Domain `bib-inside.de` zuweisen (siehe `docs/dns-setup.md`).
-7. Deploy.
+### Übersicht
+
+Zwei Services in einem Sliplane-Projekt:
+
+| Service | Was | Quelle |
+|---|---|---|
+| `bibinside-app` | Die Next.js-App | dieser GitHub-Repo, Build aus `Dockerfile` |
+| `bibinside-db` | PostgreSQL 16 | Sliplane-Postgres-Template |
+
+### Schritt-für-Schritt
+
+**1. Postgres-Service anlegen** (Service A)
+- In Sliplane: „New Service" → Postgres-Template
+- Datenbank-Name: `bibinside`, eigenen User/Passwort generieren
+- Internal Hostname notieren (z. B. `bibinside-db.internal`) — den brauchen wir gleich
+- Persistent Volume aktivieren (für Daten-Persistenz über Container-Restarts)
+
+**2. App-Service anlegen** (Service B)
+- „New Service" → GitHub-Repo `upandfine/bibel-lehre`
+- Build: `Dockerfile` (Default-Pfad)
+- Port: leer lassen — Sliplane setzt `PORT` automatisch, der Container liest sie
+
+**3. Environment-Variablen setzen** (am App-Service)
+```
+DATABASE_URL=postgres://USER:PASS@bibinside-db.internal:5432/bibinside
+NEXTAUTH_SECRET=<frisch generieren mit `openssl rand -base64 32`>
+NEXTAUTH_URL=https://<sliplane-subdomain>.sliplane.app
+NEXT_PUBLIC_APP_URL=https://<sliplane-subdomain>.sliplane.app
+NEXT_PUBLIC_APP_NAME=Bib-Inside
+RESEND_API_KEY=<Production-Key aus Resend-Dashboard>
+EMAIL_FROM=Bib-Inside <noreply@send.bib-inside.de>
+SEED_ADMIN_EMAIL=sommer@upandfine.de
+AUTH_EMAIL_LINK_TTL_MINUTES=30
+```
+
+**4. Erstes Deploy auslösen**
+Sliplane baut das Image, startet den Container. Beim Start läuft automatisch:
+1. `node ./scripts/migrate.mjs` — spielt alle ausstehenden Drizzle-Migrationen ein
+2. `node server.js` — startet den Next-Server
+
+Wenn die Migration scheitert (z. B. weil die DB nicht erreichbar ist), beendet sich der Container und Sliplane meldet „Service nicht hochgekommen". Logs in der Sliplane-UI prüfen.
+
+**5. Erst-Seed manuell ausführen** (einmalig)
+Sliplane bietet kein Pre-Deploy-Hook. Den Seed führen wir per One-Off-Befehl im laufenden Container aus:
+```bash
+# Im Sliplane-Service: Shell öffnen
+node -e "import('./scripts/seed.mjs')"   # oder via DB direkt — siehe unten
+```
+Falls das nicht möglich ist: lokal mit der Production-`DATABASE_URL` einmal `pnpm db:seed` laufen lassen (vorsichtig — schreibt produktive Daten).
+
+**6. Custom Domain** (optional, später)
+- Sliplane → Service → Domains → Add Custom Domain
+- DNS bei INWX/Hetzner setzen (siehe [docs/dns-setup.md](./docs/dns-setup.md))
+- HTTPS via Let's Encrypt automatisch
+- Anschließend `NEXTAUTH_URL` und `NEXT_PUBLIC_APP_URL` auf die neue Domain umstellen
+
+### Lokal das Production-Image testen
+
+Bevor du nach Sliplane pushst, lokal verifizieren:
+```bash
+docker build -t bibinside .
+docker run --rm -p 3000:3000 \
+  -e DATABASE_URL="postgres://bibinside:bibinside@host.docker.internal:5432/bibinside" \
+  -e NEXTAUTH_SECRET="$(openssl rand -base64 32)" \
+  -e NEXTAUTH_URL="http://localhost:3000" \
+  bibinside
+# → http://localhost:3000
+```
 
 ## Designprinzipien
 
