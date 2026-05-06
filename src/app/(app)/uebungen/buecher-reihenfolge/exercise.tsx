@@ -690,7 +690,7 @@ function SortSearchPanel({
  * Loslassen landet. Höhe 0 im Layout (nimmt keinen Platz weg), die farbige
  * Linie wird absolut darüber positioniert — so springt das Layout nicht.
  */
-function DropIndicator({ active }: { active: boolean }) {
+export function DropIndicator({ active }: { active: boolean }) {
   return (
     <li
       className="pointer-events-none relative h-0 list-none"

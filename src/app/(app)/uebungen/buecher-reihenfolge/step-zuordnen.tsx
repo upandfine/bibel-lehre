@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -13,6 +13,7 @@ import {
   useSensors,
   type CollisionDetection,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
   type UniqueIdentifier,
 } from "@dnd-kit/core";
@@ -27,6 +28,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { ArrowLeft, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
+  DropIndicator,
   POOL_ID,
   BookCardInline,
   type AssignmentMap,
@@ -70,6 +72,7 @@ export function ZuordnenStep({
   );
 
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
+  const [overId, setOverId] = useState<UniqueIdentifier | null>(null);
 
   const byId = new Map(books.map((b) => [b.id, b]));
   const colorByGroup = new Map(
@@ -84,16 +87,52 @@ export function ZuordnenStep({
     return null;
   }
 
+  /**
+   * Bestimmt für einen bestimmten Section-Container, an welcher Position
+   * (0-basiert) die Drop-Linie erscheinen soll. null = kein Indicator in
+   * diesem Container.
+   */
+  function getInsertionIndexFor(
+    containerId: string,
+    containerItems: number[],
+  ): number | null {
+    if (activeId === null || overId === null) return null;
+    const overContainer = findContainer(overId);
+    if (overContainer !== containerId) return null;
+    const activeContainer = findContainer(activeId);
+
+    // Cross-Container-Drop: Item kommt aus einem anderen Container
+    if (activeContainer !== containerId) {
+      if (typeof overId === "string") return containerItems.length;
+      return containerItems.indexOf(overId as number);
+    }
+
+    // Innerhalb desselben Containers reordern
+    if (typeof overId === "string") return containerItems.length;
+    if (activeId === overId) return null;
+    const fromIdx = containerItems.indexOf(activeId as number);
+    const toIdx = containerItems.indexOf(overId as number);
+    if (fromIdx === -1 || toIdx === -1) return null;
+    return fromIdx < toIdx ? toIdx + 1 : toIdx;
+  }
+
   function handleDragStart(event: DragStartEvent) {
     setActiveId(event.active.id);
+    setOverId(event.active.id);
+  }
+
+  function handleDragOver(event: DragOverEvent) {
+    setOverId(event.over?.id ?? null);
   }
 
   function handleDragCancel() {
     setActiveId(null);
+    setOverId(null);
   }
 
   function handleDragEnd(event: DragEndEvent) {
     setActiveId(null);
+    setOverId(null);
     const { active, over } = event;
     if (!over) return;
 
@@ -146,22 +185,27 @@ export function ZuordnenStep({
         sensors={sensors}
         collisionDetection={collisionDetection}
         onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
         <PoolContainer items={poolItems} byId={byId} />
 
         <div className="grid gap-3 sm:grid-cols-2">
-          {groups.map((g) => (
-            <SectionContainer
-              key={g}
-              id={g}
-              title={g}
-              color={colorByGroup.get(g) ?? null}
-              items={assignments[g] ?? []}
-              byId={byId}
-            />
-          ))}
+          {groups.map((g) => {
+            const items = assignments[g] ?? [];
+            return (
+              <SectionContainer
+                key={g}
+                id={g}
+                title={g}
+                color={colorByGroup.get(g) ?? null}
+                items={items}
+                byId={byId}
+                insertionIndex={getInsertionIndexFor(g, items)}
+              />
+            );
+          })}
         </div>
 
         <DragOverlay>
@@ -268,14 +312,18 @@ function SectionContainer({
   color,
   items,
   byId,
+  insertionIndex,
 }: {
   id: string;
   title: string;
   color: string | null;
   items: number[];
   byId: Map<number, Book>;
+  /** Position der Drop-Linie in dieser Box (null = keine Linie zeigen). */
+  insertionIndex: number | null;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
+  const showEmptyHint = items.length === 0 && insertionIndex === null;
 
   return (
     <div
@@ -294,18 +342,18 @@ function SectionContainer({
       </div>
       <SortableContext items={items} strategy={verticalListSortingStrategy}>
         <ul className="flex flex-1 flex-col gap-1 p-2">
+          <DropIndicator active={insertionIndex === 0} />
           {items.map((bookId, index) => {
             const book = byId.get(bookId);
             if (!book) return null;
             return (
-              <SortableSectionRow
-                key={bookId}
-                book={book}
-                index={index + 1}
-              />
+              <Fragment key={bookId}>
+                <SortableSectionRow book={book} index={index + 1} />
+                <DropIndicator active={insertionIndex === index + 1} />
+              </Fragment>
             );
           })}
-          {items.length === 0 && (
+          {showEmptyHint && (
             <li className="flex flex-1 items-center justify-center px-2 py-3 text-xs italic text-muted-foreground">
               hierher ziehen
             </li>
