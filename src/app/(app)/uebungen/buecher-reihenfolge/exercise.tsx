@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   Check,
   GripVertical,
+  LayoutGrid,
   Pencil,
   RotateCcw,
   Shuffle,
@@ -28,12 +29,13 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
+import { ZuordnenStep } from "./step-zuordnen";
 
 // ====================================================================
 // Typen
 // ====================================================================
 
-type Book = {
+export type Book = {
   id: number;
   abbr: string;
   nameDe: string;
@@ -45,13 +47,22 @@ type Book = {
   orderIndex: number;
 };
 
-type Selection =
-  | { kind: "all"; label: string }
-  | { kind: "testament"; value: "AT" | "NT"; label: string }
-  | { kind: "group"; value: string; label: string };
+type Selection = {
+  kind: "testament";
+  value: "AT" | "NT";
+  label: string;
+  count: number;
+};
 
-type Mode = "sort" | "write";
+type Mode = "zuordnen" | "sort" | "write";
 type Step = "select" | "mode" | "play" | "result";
+
+/**
+ * Zuordnen-Modus: pro Container (Pool oder Abschnittsname) eine Liste der
+ * book.ids in der vom User gewählten Reihenfolge.
+ */
+export type AssignmentMap = Record<string, number[]>;
+export const POOL_ID = "__pool";
 
 // ====================================================================
 // Helper
@@ -78,13 +89,10 @@ function normalize(s: string): string {
 }
 
 function aliasesFor(book: Book): string[] {
-  const candidates = [
-    book.nameDe,
-    book.abbr,
-    book.nameOriginalTransliterated ?? "",
-    book.nameOriginal ?? "",
-  ];
-  return candidates.map(normalize).filter((x) => x.length > 0);
+  // Bewusst nur deutscher Name + Abkürzung — Originalname/Transliteration werden
+  // angezeigt, sollen aber nicht als Eingabe akzeptiert werden (sonst kein echter
+  // Recall des deutschen Namens).
+  return [book.nameDe, book.abbr].map(normalize).filter((x) => x.length > 0);
 }
 
 function isInputCorrect(input: string, book: Book): boolean {
@@ -94,41 +102,45 @@ function isInputCorrect(input: string, book: Book): boolean {
 }
 
 function buildSelections(books: Book[]): Selection[] {
-  const result: Selection[] = [
-    { kind: "all", label: `Ganze Bibel (${books.length})` },
+  const at = books.filter((b) => b.testament === "AT").length;
+  const nt = books.filter((b) => b.testament === "NT").length;
+  return [
     {
       kind: "testament",
       value: "AT",
-      label: `Altes Testament (${books.filter((b) => b.testament === "AT").length})`,
+      label: "Altes Testament",
+      count: at,
     },
     {
       kind: "testament",
       value: "NT",
-      label: `Neues Testament (${books.filter((b) => b.testament === "NT").length})`,
+      label: "Neues Testament",
+      count: nt,
     },
   ];
-
-  // Gruppen in kanonischer Reihenfolge, in der sie zum ersten Mal auftauchen
-  const seen = new Set<string>();
-  for (const b of books) {
-    if (seen.has(b.groupName)) continue;
-    seen.add(b.groupName);
-    const count = books.filter((x) => x.groupName === b.groupName).length;
-    if (count < 3) continue; // 1–2 Bücher sind keine Reihenfolge-Übung
-    result.push({
-      kind: "group",
-      value: b.groupName,
-      label: `${b.groupName} (${count})`,
-    });
-  }
-  return result;
 }
 
 function applySelection(books: Book[], sel: Selection): Book[] {
-  if (sel.kind === "all") return books;
-  if (sel.kind === "testament")
-    return books.filter((b) => b.testament === sel.value);
-  return books.filter((b) => b.groupName === sel.value);
+  return books.filter((b) => b.testament === sel.value);
+}
+
+/** Gruppennamen in kanonischer Reihenfolge, wie sie in den Büchern erstmals auftreten. */
+function groupsInOrder(books: Book[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const b of books) {
+    if (seen.has(b.groupName)) continue;
+    seen.add(b.groupName);
+    out.push(b.groupName);
+  }
+  return out;
+}
+
+function emptyAssignments(books: Book[]): AssignmentMap {
+  const groups = groupsInOrder(books);
+  const map: AssignmentMap = { [POOL_ID]: shuffle(books.map((b) => b.id)) };
+  for (const g of groups) map[g] = [];
+  return map;
 }
 
 // ====================================================================
@@ -141,6 +153,7 @@ export function BookOrderExercise({ books }: { books: Book[] }) {
   const [mode, setMode] = useState<Mode | null>(null);
   const [userOrder, setUserOrder] = useState<number[]>([]);
   const [userInputs, setUserInputs] = useState<string[]>([]);
+  const [userAssignments, setUserAssignments] = useState<AssignmentMap>({});
 
   const selections = useMemo(() => buildSelections(books), [books]);
   const filteredBooks = useMemo(
@@ -152,8 +165,10 @@ export function BookOrderExercise({ books }: { books: Book[] }) {
     setMode(m);
     if (m === "sort") {
       setUserOrder(shuffle(filteredBooks.map((b) => b.id)));
-    } else {
+    } else if (m === "write") {
       setUserInputs(filteredBooks.map(() => ""));
+    } else {
+      setUserAssignments(emptyAssignments(filteredBooks));
     }
     setStep("play");
   }
@@ -164,6 +179,7 @@ export function BookOrderExercise({ books }: { books: Book[] }) {
     setMode(null);
     setUserOrder([]);
     setUserInputs([]);
+    setUserAssignments({});
   }
 
   if (step === "select") {
@@ -185,6 +201,19 @@ export function BookOrderExercise({ books }: { books: Book[] }) {
         count={filteredBooks.length}
         onMode={startMode}
         onBack={backToSelection}
+      />
+    );
+  }
+
+  if (step === "play" && mode === "zuordnen" && selection) {
+    return (
+      <ZuordnenStep
+        books={filteredBooks}
+        groups={groupsInOrder(filteredBooks)}
+        assignments={userAssignments}
+        onChange={setUserAssignments}
+        onCheck={() => setStep("result")}
+        onBack={() => setStep("mode")}
       />
     );
   }
@@ -220,6 +249,7 @@ export function BookOrderExercise({ books }: { books: Book[] }) {
         mode={mode}
         userOrder={userOrder}
         userInputs={userInputs}
+        userAssignments={userAssignments}
         onAgain={() => startMode(mode)}
         onReset={backToSelection}
       />
@@ -243,17 +273,20 @@ function SelectionStep({
   return (
     <div className="space-y-4">
       <h2 className="text-sm font-medium text-muted-foreground">
-        Welche Bücher willst du üben?
+        Welchen Teil der Bibel willst du üben?
       </h2>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         {selections.map((s) => (
           <button
-            key={`${s.kind}-${"value" in s ? s.value : "all"}`}
+            key={s.value}
             type="button"
             onClick={() => onSelect(s)}
-            className="rounded-lg border bg-card px-4 py-3 text-left text-sm font-medium transition-colors hover:border-foreground/40 hover:bg-accent"
+            className="group rounded-lg border bg-card p-5 text-left transition-colors hover:border-foreground/40 hover:bg-accent"
           >
-            {s.label}
+            <p className="font-medium">{s.label}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {s.count} Bücher
+            </p>
           </button>
         ))}
       </div>
@@ -282,11 +315,26 @@ function ModeStep({
       <div>
         <h2 className="font-medium">{selection.label}</h2>
         <p className="text-sm text-muted-foreground">
-          Wie willst du üben? {count} Bücher in der richtigen Reihenfolge.
+          {count} Bücher. Wähle, wie du üben möchtest.
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <button
+          type="button"
+          onClick={() => onMode("zuordnen")}
+          className="group flex flex-col gap-2 rounded-lg border bg-card p-5 text-left transition-colors hover:border-foreground/40"
+        >
+          <div className="flex items-center gap-2">
+            <LayoutGrid className="h-4 w-4" />
+            <span className="font-medium">Zuordnen</span>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Ordne jedes Buch dem richtigen Abschnitt zu (Pentateuch, Geschichte
+            …) — und sortiere es innerhalb des Abschnitts.
+          </p>
+        </button>
+
         <button
           type="button"
           onClick={() => onMode("sort")}
@@ -298,7 +346,7 @@ function ModeStep({
           </div>
           <p className="text-sm text-muted-foreground">
             Die Bücher liegen gemischt vor — bringe sie per Drag&amp;Drop in die
-            richtige Reihenfolge.
+            komplette kanonische Reihenfolge.
           </p>
         </button>
 
@@ -507,11 +555,66 @@ function WriteStep({
 // Step 4 — Auswertung
 // ====================================================================
 
+type ZuordnenEvaluation = {
+  book: Book;
+  userContainer: string | null; // POOL_ID, groupName oder null wenn nirgends
+  userPositionInContainer: number | null; // 1-basiert
+  isInCorrectGroup: boolean;
+  isInCorrectPosition: boolean;
+};
+
+function evaluateZuordnen(
+  books: Book[],
+  assignments: AssignmentMap,
+): ZuordnenEvaluation[] {
+  // Pro Gruppe: erwartete Reihenfolge der Bücher
+  const expectedOrderByGroup = new Map<string, number[]>();
+  for (const b of books) {
+    const arr = expectedOrderByGroup.get(b.groupName) ?? [];
+    arr.push(b.id);
+    expectedOrderByGroup.set(b.groupName, arr);
+  }
+
+  // Pro Buch: in welchem Container liegt es?
+  const containerByBookId = new Map<number, string>();
+  for (const [container, ids] of Object.entries(assignments)) {
+    for (const id of ids) containerByBookId.set(id, container);
+  }
+
+  return books.map((book) => {
+    const userContainer = containerByBookId.get(book.id) ?? null;
+    const isInCorrectGroup = userContainer === book.groupName;
+    let userPositionInContainer: number | null = null;
+    let isInCorrectPosition = false;
+
+    if (userContainer && userContainer !== POOL_ID) {
+      const idsInContainer = assignments[userContainer] ?? [];
+      const idx = idsInContainer.indexOf(book.id);
+      if (idx !== -1) userPositionInContainer = idx + 1;
+
+      if (isInCorrectGroup) {
+        const expected = expectedOrderByGroup.get(book.groupName) ?? [];
+        const expectedIdx = expected.indexOf(book.id);
+        isInCorrectPosition = idx === expectedIdx;
+      }
+    }
+
+    return {
+      book,
+      userContainer,
+      userPositionInContainer,
+      isInCorrectGroup,
+      isInCorrectPosition,
+    };
+  });
+}
+
 function ResultStep({
   books,
   mode,
   userOrder,
   userInputs,
+  userAssignments,
   onAgain,
   onReset,
 }: {
@@ -519,9 +622,21 @@ function ResultStep({
   mode: Mode;
   userOrder: number[];
   userInputs: string[];
+  userAssignments: AssignmentMap;
   onAgain: () => void;
   onReset: () => void;
 }) {
+  if (mode === "zuordnen") {
+    return (
+      <ZuordnenResult
+        books={books}
+        assignments={userAssignments}
+        onAgain={onAgain}
+        onReset={onReset}
+      />
+    );
+  }
+
   const byId = new Map(books.map((b) => [b.id, b]));
 
   // Pro Position: war die Antwort an dieser Position richtig?
@@ -596,23 +711,164 @@ function ResultStep({
         ))}
       </ol>
 
-      <div className="flex flex-wrap items-center gap-2 pt-2">
-        <button
-          type="button"
-          onClick={onAgain}
-          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          <RotateCcw className="h-4 w-4" />
-          Nochmal mit gleicher Auswahl
-        </button>
-        <button
-          type="button"
-          onClick={onReset}
-          className="rounded-md border bg-background px-4 py-2 text-sm font-medium hover:bg-accent"
-        >
-          Andere Auswahl
-        </button>
+      <ResultActions onAgain={onAgain} onReset={onReset} />
+    </div>
+  );
+}
+
+function ZuordnenResult({
+  books,
+  assignments,
+  onAgain,
+  onReset,
+}: {
+  books: Book[];
+  assignments: AssignmentMap;
+  onAgain: () => void;
+  onReset: () => void;
+}) {
+  const evaluations = evaluateZuordnen(books, assignments);
+  const inGroup = evaluations.filter((e) => e.isInCorrectGroup).length;
+  const inGroupAndPosition = evaluations.filter(
+    (e) => e.isInCorrectPosition,
+  ).length;
+  const total = evaluations.length;
+  const percent = Math.round((inGroupAndPosition / total) * 100);
+
+  // Gruppen-Reihenfolge bestimmen
+  const groupsInOrder: string[] = [];
+  const seen = new Set<string>();
+  for (const b of books) {
+    if (!seen.has(b.groupName)) {
+      seen.add(b.groupName);
+      groupsInOrder.push(b.groupName);
+    }
+  }
+  const colorByGroup = new Map(
+    books.map((b) => [b.groupName, b.groupColor ?? null]),
+  );
+  const evalByGroup = new Map<string, ZuordnenEvaluation[]>();
+  for (const g of groupsInOrder) evalByGroup.set(g, []);
+  for (const e of evaluations) {
+    evalByGroup.get(e.book.groupName)?.push(e);
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-xl border bg-card p-5">
+        <p className="text-sm text-muted-foreground">Ergebnis</p>
+        <p className="mt-1 font-serif text-2xl font-semibold">
+          {inGroupAndPosition} von {total} vollständig richtig{" "}
+          <span className="text-muted-foreground">({percent}%)</span>
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Im richtigen Abschnitt: <strong>{inGroup}</strong> · davon in
+          richtiger Reihenfolge: <strong>{inGroupAndPosition}</strong>
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {encouragement(percent)}
+        </p>
       </div>
+
+      <div className="space-y-3">
+        {groupsInOrder.map((g) => {
+          const evalsForGroup = evalByGroup.get(g) ?? [];
+          return (
+            <div
+              key={g}
+              className="overflow-hidden rounded-lg border-l-4 bg-card"
+              style={{ borderLeftColor: colorByGroup.get(g) ?? "#94a3b8" }}
+            >
+              <h3 className="border-b px-3 py-2 text-sm font-medium">{g}</h3>
+              <ul className="divide-y">
+                {evalsForGroup.map((e, idx) => (
+                  <li
+                    key={e.book.id}
+                    className={cn(
+                      "flex items-start gap-3 px-3 py-2",
+                      !e.isInCorrectGroup &&
+                        "bg-red-50/40 dark:bg-red-950/10",
+                      e.isInCorrectGroup &&
+                        !e.isInCorrectPosition &&
+                        "bg-amber-50/40 dark:bg-amber-950/10",
+                    )}
+                  >
+                    <span className="mt-0.5 w-5 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                      {idx + 1}.
+                    </span>
+                    <span className="mt-0.5 shrink-0">
+                      {e.isInCorrectPosition ? (
+                        <Check className="h-4 w-4 text-green-700 dark:text-green-400" />
+                      ) : e.isInCorrectGroup ? (
+                        <Shuffle className="h-4 w-4 text-amber-700 dark:text-amber-400" />
+                      ) : (
+                        <X className="h-4 w-4 text-red-700 dark:text-red-400" />
+                      )}
+                    </span>
+                    <div className="flex-1">
+                      <BookCardInline book={e.book} />
+                      {!e.isInCorrectGroup && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Du hattest es{" "}
+                          <span className="font-medium text-foreground">
+                            {labelForContainer(e.userContainer)}
+                          </span>
+                          .
+                        </p>
+                      )}
+                      {e.isInCorrectGroup && !e.isInCorrectPosition && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Im richtigen Abschnitt, aber an Position{" "}
+                          <span className="font-medium text-foreground">
+                            {e.userPositionInContainer}
+                          </span>{" "}
+                          statt {idx + 1}.
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
+      </div>
+
+      <ResultActions onAgain={onAgain} onReset={onReset} />
+    </div>
+  );
+}
+
+function labelForContainer(container: string | null): string {
+  if (container === null) return "nirgends abgelegt";
+  if (container === POOL_ID) return "noch im Pool";
+  return `unter „${container}"`;
+}
+
+function ResultActions({
+  onAgain,
+  onReset,
+}: {
+  onAgain: () => void;
+  onReset: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 pt-2">
+      <button
+        type="button"
+        onClick={onAgain}
+        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+      >
+        <RotateCcw className="h-4 w-4" />
+        Nochmal mit gleicher Auswahl
+      </button>
+      <button
+        type="button"
+        onClick={onReset}
+        className="rounded-md border bg-background px-4 py-2 text-sm font-medium hover:bg-accent"
+      >
+        Andere Auswahl
+      </button>
     </div>
   );
 }
@@ -629,7 +885,7 @@ function encouragement(percent: number): string {
 // Geteilte Karten-Darstellung
 // ====================================================================
 
-function BookCardInline({ book }: { book: Book }) {
+export function BookCardInline({ book }: { book: Book }) {
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2.5">
       <span
