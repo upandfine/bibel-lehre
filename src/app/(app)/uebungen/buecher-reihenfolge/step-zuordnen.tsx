@@ -1,14 +1,19 @@
 "use client";
 
+import { useState } from "react";
 import {
   DndContext,
+  DragOverlay,
   KeyboardSensor,
   PointerSensor,
-  closestCorners,
+  pointerWithin,
+  rectIntersection,
   useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
+  type DragStartEvent,
   type UniqueIdentifier,
 } from "@dnd-kit/core";
 import {
@@ -27,6 +32,18 @@ import {
   type AssignmentMap,
   type Book,
 } from "./exercise";
+
+/**
+ * Pointer-First Collision-Detection für Multi-Container.
+ * `pointerWithin` triggert auch über leeren Containern (im Gegensatz zu `closestCorners`,
+ * das auf Items abzielt). Falls der Pointer mal außerhalb aller Container ist,
+ * fällt es auf `rectIntersection` zurück.
+ */
+const collisionDetection: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args);
+  if (pointerCollisions.length > 0) return pointerCollisions;
+  return rectIntersection(args);
+};
 
 type Props = {
   books: Book[];
@@ -52,6 +69,8 @@ export function ZuordnenStep({
     }),
   );
 
+  const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
+
   const byId = new Map(books.map((b) => [b.id, b]));
   const colorByGroup = new Map(
     books.map((b) => [b.groupName, b.groupColor ?? null]),
@@ -65,7 +84,16 @@ export function ZuordnenStep({
     return null;
   }
 
+  function handleDragStart(event: DragStartEvent) {
+    setActiveId(event.active.id);
+  }
+
+  function handleDragCancel() {
+    setActiveId(null);
+  }
+
   function handleDragEnd(event: DragEndEvent) {
+    setActiveId(null);
     const { active, over } = event;
     if (!over) return;
 
@@ -116,8 +144,10 @@ export function ZuordnenStep({
 
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCorners}
+        collisionDetection={collisionDetection}
+        onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
       >
         <PoolContainer items={poolItems} byId={byId} />
 
@@ -133,6 +163,12 @@ export function ZuordnenStep({
             />
           ))}
         </div>
+
+        <DragOverlay>
+          {activeId !== null && byId.get(activeId as number) ? (
+            <DragOverlayCard book={byId.get(activeId as number)!} />
+          ) : null}
+        </DragOverlay>
       </DndContext>
 
       <div className="sticky bottom-4 flex items-center justify-between pt-2">
@@ -213,7 +249,7 @@ function SortableChip({ book }: { book: Book }) {
       {...listeners}
       className={cn(
         "cursor-grab touch-none rounded-md border bg-card px-2.5 py-1 text-sm shadow-sm hover:bg-accent active:cursor-grabbing",
-        isDragging && "z-10 shadow-md ring-2 ring-foreground/20",
+        isDragging && "opacity-30",
       )}
       aria-label={`${book.nameDe} ziehen`}
     >
@@ -296,7 +332,7 @@ function SortableSectionRow({ book, index }: { book: Book; index: number }) {
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
         "flex items-center gap-2 rounded-md border bg-background p-1.5 pr-2",
-        isDragging && "z-10 shadow-md ring-2 ring-foreground/20",
+        isDragging && "opacity-30",
       )}
     >
       <button
@@ -313,6 +349,19 @@ function SortableSectionRow({ book, index }: { book: Book; index: number }) {
       </span>
       <BookCardInline book={book} />
     </li>
+  );
+}
+
+/**
+ * Was während des Drags am Cursor schwebt — bewusst groß und konsistent,
+ * damit der User die Buchkarte gut sehen kann, egal woher gezogen wurde.
+ */
+function DragOverlayCard({ book }: { book: Book }) {
+  return (
+    <div className="flex cursor-grabbing items-center gap-2 rounded-md border-2 border-foreground/30 bg-card p-1.5 pr-2 shadow-2xl">
+      <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
+      <BookCardInline book={book} />
+    </div>
   );
 }
 
