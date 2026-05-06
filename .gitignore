@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build-Output
+.next/
+out/
+build/
+dist/
+tsconfig.tsbuildinfo
+
+# Lokale Umgebung
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude Code (lokale, persönliche Config)
+.claude/settings.local.json
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Testing
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+playwright/.cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Drizzle
+drizzle/.snapshot
+
+# Sliplane / Docker
+.sliplane/
+docker-data/
+postgres-data/
+
+# Lizenz-Antworten (Original-PDFs der Verlage — nicht in Git)
+lizenz-anfragen/antworten/
+
+# Original-Quellmaterialien (urheberrechtlich geschützt — nicht in Git)
+input/

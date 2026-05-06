@@ -1,0 +1,28 @@
+# Lokale Entwicklungs-Umgebung für Bib-Inside.
+# Production läuft über Sliplane (separater Postgres-Service).
+#
+# Start: docker compose up -d
+# Stop:  docker compose down
+# Reset: docker compose down -v   (löscht auch das Daten-Volume!)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bibinside-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bibinside
+      POSTGRES_PASSWORD: bibinside
+      POSTGRES_DB: bibinside
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bibinside"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:
