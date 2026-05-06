@@ -191,6 +191,12 @@ export const bibleBooks = pgTable(
     id: smallint("id").primaryKey(), // 1..66
     abbr: varchar("abbr", { length: 10 }).notNull().unique(), // z.B. "1Mo", "Joh"
     nameDe: varchar("name_de", { length: 50 }).notNull(),
+    // Originalname (hebräisch für AT, griechisch für NT) in Originalschrift mit Punktierung
+    nameOriginal: varchar("name_original", { length: 100 }),
+    // Lateinische Umschrift wie sie in deutschsprachiger Theologie üblich ist (z.B. "Bereschit")
+    nameOriginalTransliterated: varchar("name_original_transliterated", {
+      length: 60,
+    }),
     testament: testamentEnum("testament").notNull(),
     groupName: varchar("group_name", { length: 50 }).notNull(), // "Pentateuch", "Evangelien", ...
     groupColor: varchar("group_color", { length: 20 }), // Hex/Tailwind-Token

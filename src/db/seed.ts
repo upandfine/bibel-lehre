@@ -55,6 +55,8 @@ async function seedBibleBooks() {
         id: b.id,
         abbr: b.abbr,
         nameDe: b.nameDe,
+        nameOriginal: b.nameOriginal,
+        nameOriginalTransliterated: b.nameOriginalTransliterated,
         testament: b.testament,
         groupName: b.groupName,
         groupColor: b.groupColor,
@@ -62,7 +64,23 @@ async function seedBibleBooks() {
         chapterCount: b.chapterCount,
         summary: b.summary,
       })
-      .onConflictDoNothing();
+      // Stammdaten dürfen sich beim Re-Seed aktualisieren — z.B. wenn neue
+      // Felder hinzukommen oder Tippfehler im Namen korrigiert werden.
+      .onConflictDoUpdate({
+        target: bibleBooks.id,
+        set: {
+          abbr: b.abbr,
+          nameDe: b.nameDe,
+          nameOriginal: b.nameOriginal,
+          nameOriginalTransliterated: b.nameOriginalTransliterated,
+          testament: b.testament,
+          groupName: b.groupName,
+          groupColor: b.groupColor,
+          orderIndex: b.orderIndex,
+          chapterCount: b.chapterCount,
+          summary: b.summary,
+        },
+      });
   }
   console.log(`  ✓ ${bibleBooksSeed.length} Bücher sichergestellt`);
 }
