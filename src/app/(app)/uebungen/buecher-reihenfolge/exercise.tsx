@@ -20,6 +20,8 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -401,6 +403,11 @@ function SortStep({
   const [searchAt, setSearchAt] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Drop-Indicator: während des Drags zeigen wir eine farbige Linie genau an
+  // der Position, an der das Item beim Loslassen landen würde.
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const [overId, setOverId] = useState<number | null>(null);
+
   function toggleSearchAt(index: number) {
     if (searchAt === index) {
       closeSearch();
@@ -427,13 +434,39 @@ function SortStep({
     closeSearch();
   }
 
+  function handleDragStart(e: DragStartEvent) {
+    setActiveId(e.active.id as number);
+    setOverId((e.active.id as number) ?? null);
+  }
+
+  function handleDragOver(e: DragOverEvent) {
+    setOverId((e.over?.id as number | undefined) ?? null);
+  }
+
+  function resetDrag() {
+    setActiveId(null);
+    setOverId(null);
+  }
+
   function handleDragEnd(e: DragEndEvent) {
+    resetDrag();
     const { active, over } = e;
     if (!over || active.id === over.id) return;
     const oldIndex = userOrder.indexOf(active.id as number);
     const newIndex = userOrder.indexOf(over.id as number);
     onChange(arrayMove(userOrder, oldIndex, newIndex));
   }
+
+  // Index, an dem die Drop-Linie eingeblendet werden soll. 0 = ganz oben,
+  // userOrder.length = ganz unten. null = kein Drag aktiv.
+  const insertionIndex = (() => {
+    if (activeId === null || overId === null || activeId === overId)
+      return null;
+    const fromIdx = userOrder.indexOf(activeId);
+    const toIdx = userOrder.indexOf(overId);
+    if (fromIdx === -1 || toIdx === -1) return null;
+    return fromIdx < toIdx ? toIdx + 1 : toIdx;
+  })();
 
   return (
     <div className="space-y-4">
@@ -447,13 +480,17 @@ function SortStep({
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
+        onDragCancel={resetDrag}
       >
         <SortableContext
           items={userOrder}
           strategy={verticalListSortingStrategy}
         >
           <ol className="space-y-1.5">
+            <DropIndicator active={insertionIndex === 0} />
             {userOrder.map((bookId, index) => {
               const book = byId.get(bookId);
               if (!book) return null;
@@ -480,6 +517,7 @@ function SortStep({
                       />
                     </li>
                   )}
+                  <DropIndicator active={insertionIndex === index + 1} />
                 </Fragment>
               );
             })}
@@ -644,6 +682,27 @@ function SortSearchPanel({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Eindeutiger visueller Hinweis, an welcher Stelle das gezogene Item beim
+ * Loslassen landet. Höhe 0 im Layout (nimmt keinen Platz weg), die farbige
+ * Linie wird absolut darüber positioniert — so springt das Layout nicht.
+ */
+function DropIndicator({ active }: { active: boolean }) {
+  return (
+    <li
+      className="pointer-events-none relative h-0 list-none"
+      aria-hidden="true"
+    >
+      <div
+        className={cn(
+          "absolute -top-1 left-0 right-0 h-1 rounded-full transition-opacity duration-150",
+          active ? "bg-primary opacity-100" : "opacity-0",
+        )}
+      />
+    </li>
   );
 }
 
