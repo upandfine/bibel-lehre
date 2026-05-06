@@ -554,7 +554,7 @@ function SortableBookRow({
         className="-mx-1 flex-1 rounded px-1 py-0.5 text-left hover:bg-accent/50"
         aria-label={`Suche unter ${book.nameDe} öffnen`}
       >
-        <BookCardInline book={book} />
+        <BookCardInline book={book} showColor={false} />
       </button>
     </li>
   );
@@ -1048,14 +1048,28 @@ function encouragement(percent: number): string {
 // Geteilte Karten-Darstellung
 // ====================================================================
 
-export function BookCardInline({ book }: { book: Book }) {
+export function BookCardInline({
+  book,
+  showColor = true,
+}: {
+  book: Book;
+  /**
+   * Wenn true, wird der Gruppen-Farbbalken links angezeigt. Während aktiver
+   * Übungen bewusst auf false setzen, damit die Farbe nicht direkt verrät, in
+   * welche Gruppe ein Buch gehört. In der Auswertung dann wieder true für den
+   * visuellen Lerneffekt.
+   */
+  showColor?: boolean;
+}) {
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2.5">
-      <span
-        aria-hidden
-        className="h-6 w-1 shrink-0 rounded-full"
-        style={{ backgroundColor: book.groupColor ?? "#94a3b8" }}
-      />
+      {showColor && (
+        <span
+          aria-hidden
+          className="h-6 w-1 shrink-0 rounded-full"
+          style={{ backgroundColor: book.groupColor ?? "#94a3b8" }}
+        />
+      )}
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{book.nameDe}</p>
         {book.nameOriginal && (

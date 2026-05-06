@@ -347,7 +347,7 @@ function SortableSectionRow({ book, index }: { book: Book; index: number }) {
       <span className="w-5 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
         {index}.
       </span>
-      <BookCardInline book={book} />
+      <BookCardInline book={book} showColor={false} />
     </li>
   );
 }
@@ -360,7 +360,7 @@ function DragOverlayCard({ book }: { book: Book }) {
   return (
     <div className="flex cursor-grabbing items-center gap-2 rounded-md border-2 border-foreground/30 bg-card p-1.5 pr-2 shadow-2xl">
       <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
-      <BookCardInline book={book} />
+      <BookCardInline book={book} showColor={false} />
     </div>
   );
 }
