@@ -44,7 +44,7 @@ Die App unterstützt:
 ## Häufige Befehle
 
 ```bash
-pnpm dev               # Dev-Server (Hot-Reload, http://localhost:3000)
+pnpm dev               # Dev-Server (Hot-Reload, http://localhost:3050)
 pnpm build             # Production-Build
 pnpm typecheck         # TypeScript-Check ohne Build
 pnpm lint              # ESLint

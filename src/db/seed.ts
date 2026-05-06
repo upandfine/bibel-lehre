@@ -13,10 +13,6 @@
  *   - Optional: Erster Admin-User aus SEED_ADMIN_EMAIL
  */
 
-import "dotenv/config";
-import { config as loadDotenv } from "dotenv";
-loadDotenv({ path: ".env.local", override: true });
-
 import { eq, and, sql } from "drizzle-orm";
 import { db } from "./index";
 import {
