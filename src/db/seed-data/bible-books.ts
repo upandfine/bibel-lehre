@@ -25,15 +25,15 @@ export type SeedBibleBook = {
 };
 
 const PENTATEUCH = "#d97706"; // amber-600
-const GESCHICHTE = "#ca8a04"; // yellow-600
+const GESCHICHTE_AT = "#ca8a04"; // yellow-600
 const POESIE = "#16a34a"; // green-600
 const GROSSE_PROPH = "#0284c7"; // sky-600
 const KLEINE_PROPH = "#06b6d4"; // cyan-500
 const EVANGELIEN = "#dc2626"; // red-600
-const APG = "#9333ea"; // purple-600
+const GESCHICHTE_NT = "#9333ea"; // purple-600
 const PAULUS = "#0891b2"; // cyan-700
 const ALLG_BRIEFE = "#64748b"; // slate-500
-const OFFENBARUNG = "#e11d48"; // rose-600
+const PROPHETIE = "#e11d48"; // rose-600
 
 export const bibleBooksSeed: SeedBibleBook[] = [
   // === Pentateuch ===
@@ -44,18 +44,18 @@ export const bibleBooksSeed: SeedBibleBook[] = [
   { id: 5, abbr: "5Mo", nameDe: "5. Mose", nameOriginal: "דְּבָרִים", nameOriginalTransliterated: "Devarim", testament: "AT", groupName: "Pentateuch", groupColor: PENTATEUCH, orderIndex: 5, chapterCount: 34, summary: "Deuteronomium — Bundesreden vor dem Land" },
 
   // === Geschichtsbücher ===
-  { id: 6, abbr: "Jos", nameDe: "Josua", nameOriginal: "יְהוֹשֻׁעַ", nameOriginalTransliterated: "Jehoschua", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE, orderIndex: 6, chapterCount: 24, summary: "Landnahme Kanaans" },
-  { id: 7, abbr: "Ri", nameDe: "Richter", nameOriginal: "שׁוֹפְטִים", nameOriginalTransliterated: "Schoftim", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE, orderIndex: 7, chapterCount: 21, summary: "Zeit der Richter Israels" },
-  { id: 8, abbr: "Ru", nameDe: "Rut", nameOriginal: "רוּת", nameOriginalTransliterated: "Rut", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE, orderIndex: 8, chapterCount: 4, summary: "Treue und Erlösung in der Familie Davids" },
-  { id: 9, abbr: "1Sam", nameDe: "1. Samuel", nameOriginal: "שְׁמוּאֵל א", nameOriginalTransliterated: "Schmuel Alef", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE, orderIndex: 9, chapterCount: 31, summary: "Samuel, Saul, Aufstieg Davids" },
-  { id: 10, abbr: "2Sam", nameDe: "2. Samuel", nameOriginal: "שְׁמוּאֵל ב", nameOriginalTransliterated: "Schmuel Bet", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE, orderIndex: 10, chapterCount: 24, summary: "Königtum Davids" },
-  { id: 11, abbr: "1Kö", nameDe: "1. Könige", nameOriginal: "מְלָכִים א", nameOriginalTransliterated: "Melachim Alef", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE, orderIndex: 11, chapterCount: 22, summary: "Salomo bis zur Reichsteilung" },
-  { id: 12, abbr: "2Kö", nameDe: "2. Könige", nameOriginal: "מְלָכִים ב", nameOriginalTransliterated: "Melachim Bet", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE, orderIndex: 12, chapterCount: 25, summary: "Bis zum Exil von Juda" },
-  { id: 13, abbr: "1Chr", nameDe: "1. Chronik", nameOriginal: "דִּבְרֵי הַיָּמִים א", nameOriginalTransliterated: "Divrei haJamim Alef", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE, orderIndex: 13, chapterCount: 29, summary: "Genealogien und David" },
-  { id: 14, abbr: "2Chr", nameDe: "2. Chronik", nameOriginal: "דִּבְרֵי הַיָּמִים ב", nameOriginalTransliterated: "Divrei haJamim Bet", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE, orderIndex: 14, chapterCount: 36, summary: "Salomo bis Exil aus priesterlicher Sicht" },
-  { id: 15, abbr: "Esr", nameDe: "Esra", nameOriginal: "עֶזְרָא", nameOriginalTransliterated: "Esra", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE, orderIndex: 15, chapterCount: 10, summary: "Rückkehr aus dem Exil und Tempelbau" },
-  { id: 16, abbr: "Neh", nameDe: "Nehemia", nameOriginal: "נְחֶמְיָה", nameOriginalTransliterated: "Nechemja", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE, orderIndex: 16, chapterCount: 13, summary: "Wiederaufbau der Mauern Jerusalems" },
-  { id: 17, abbr: "Est", nameDe: "Ester", nameOriginal: "אֶסְתֵּר", nameOriginalTransliterated: "Ester", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE, orderIndex: 17, chapterCount: 10, summary: "Bewahrung Israels in der Diaspora" },
+  { id: 6, abbr: "Jos", nameDe: "Josua", nameOriginal: "יְהוֹשֻׁעַ", nameOriginalTransliterated: "Jehoschua", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE_AT, orderIndex: 6, chapterCount: 24, summary: "Landnahme Kanaans" },
+  { id: 7, abbr: "Ri", nameDe: "Richter", nameOriginal: "שׁוֹפְטִים", nameOriginalTransliterated: "Schoftim", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE_AT, orderIndex: 7, chapterCount: 21, summary: "Zeit der Richter Israels" },
+  { id: 8, abbr: "Ru", nameDe: "Rut", nameOriginal: "רוּת", nameOriginalTransliterated: "Rut", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE_AT, orderIndex: 8, chapterCount: 4, summary: "Treue und Erlösung in der Familie Davids" },
+  { id: 9, abbr: "1Sam", nameDe: "1. Samuel", nameOriginal: "שְׁמוּאֵל א", nameOriginalTransliterated: "Schmuel Alef", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE_AT, orderIndex: 9, chapterCount: 31, summary: "Samuel, Saul, Aufstieg Davids" },
+  { id: 10, abbr: "2Sam", nameDe: "2. Samuel", nameOriginal: "שְׁמוּאֵל ב", nameOriginalTransliterated: "Schmuel Bet", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE_AT, orderIndex: 10, chapterCount: 24, summary: "Königtum Davids" },
+  { id: 11, abbr: "1Kö", nameDe: "1. Könige", nameOriginal: "מְלָכִים א", nameOriginalTransliterated: "Melachim Alef", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE_AT, orderIndex: 11, chapterCount: 22, summary: "Salomo bis zur Reichsteilung" },
+  { id: 12, abbr: "2Kö", nameDe: "2. Könige", nameOriginal: "מְלָכִים ב", nameOriginalTransliterated: "Melachim Bet", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE_AT, orderIndex: 12, chapterCount: 25, summary: "Bis zum Exil von Juda" },
+  { id: 13, abbr: "1Chr", nameDe: "1. Chronik", nameOriginal: "דִּבְרֵי הַיָּמִים א", nameOriginalTransliterated: "Divrei haJamim Alef", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE_AT, orderIndex: 13, chapterCount: 29, summary: "Genealogien und David" },
+  { id: 14, abbr: "2Chr", nameDe: "2. Chronik", nameOriginal: "דִּבְרֵי הַיָּמִים ב", nameOriginalTransliterated: "Divrei haJamim Bet", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE_AT, orderIndex: 14, chapterCount: 36, summary: "Salomo bis Exil aus priesterlicher Sicht" },
+  { id: 15, abbr: "Esr", nameDe: "Esra", nameOriginal: "עֶזְרָא", nameOriginalTransliterated: "Esra", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE_AT, orderIndex: 15, chapterCount: 10, summary: "Rückkehr aus dem Exil und Tempelbau" },
+  { id: 16, abbr: "Neh", nameDe: "Nehemia", nameOriginal: "נְחֶמְיָה", nameOriginalTransliterated: "Nechemja", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE_AT, orderIndex: 16, chapterCount: 13, summary: "Wiederaufbau der Mauern Jerusalems" },
+  { id: 17, abbr: "Est", nameDe: "Ester", nameOriginal: "אֶסְתֵּר", nameOriginalTransliterated: "Ester", testament: "AT", groupName: "Geschichtsbücher", groupColor: GESCHICHTE_AT, orderIndex: 17, chapterCount: 10, summary: "Bewahrung Israels in der Diaspora" },
 
   // === Lehrbücher / Poesie ===
   { id: 18, abbr: "Hi", nameDe: "Hiob", nameOriginal: "אִיּוֹב", nameOriginalTransliterated: "Ijow", testament: "AT", groupName: "Lehrbücher", groupColor: POESIE, orderIndex: 18, chapterCount: 42, summary: "Leid und Souveränität Gottes" },
@@ -91,8 +91,8 @@ export const bibleBooksSeed: SeedBibleBook[] = [
   { id: 42, abbr: "Lk", nameDe: "Lukas", nameOriginal: "Κατὰ Λουκᾶν", nameOriginalTransliterated: "Kata Lukan", testament: "NT", groupName: "Evangelien", groupColor: EVANGELIEN, orderIndex: 42, chapterCount: 24, summary: "Jesus als Retter aller Menschen" },
   { id: 43, abbr: "Joh", nameDe: "Johannes", nameOriginal: "Κατὰ Ἰωάννην", nameOriginalTransliterated: "Kata Iōannēn", testament: "NT", groupName: "Evangelien", groupColor: EVANGELIEN, orderIndex: 43, chapterCount: 21, summary: "Jesus als ewiger Sohn Gottes" },
 
-  // === Apostelgeschichte ===
-  { id: 44, abbr: "Apg", nameDe: "Apostelgeschichte", nameOriginal: "Πράξεις Ἀποστόλων", nameOriginalTransliterated: "Praxeis Apostolōn", testament: "NT", groupName: "Apostelgeschichte", groupColor: APG, orderIndex: 44, chapterCount: 28, summary: "Wirken des Heiligen Geistes in der jungen Gemeinde" },
+  // === Geschichte (NT) ===
+  { id: 44, abbr: "Apg", nameDe: "Apostelgeschichte", nameOriginal: "Πράξεις Ἀποστόλων", nameOriginalTransliterated: "Praxeis Apostolōn", testament: "NT", groupName: "Geschichte", groupColor: GESCHICHTE_NT, orderIndex: 44, chapterCount: 28, summary: "Wirken des Heiligen Geistes in der jungen Gemeinde" },
 
   // === Paulusbriefe ===
   { id: 45, abbr: "Röm", nameDe: "Römer", nameOriginal: "Πρὸς Ῥωμαίους", nameOriginalTransliterated: "Pros Rōmaious", testament: "NT", groupName: "Paulusbriefe", groupColor: PAULUS, orderIndex: 45, chapterCount: 16, summary: "Rechtfertigung aus Glauben" },
@@ -119,6 +119,6 @@ export const bibleBooksSeed: SeedBibleBook[] = [
   { id: 64, abbr: "3Joh", nameDe: "3. Johannes", nameOriginal: "Ἰωάννου Γʹ", nameOriginalTransliterated: "Iōannou Gamma", testament: "NT", groupName: "Allgemeine Briefe", groupColor: ALLG_BRIEFE, orderIndex: 64, chapterCount: 1, summary: "Gastfreundschaft und Treue" },
   { id: 65, abbr: "Jud", nameDe: "Judas", nameOriginal: "Ἰούδα", nameOriginalTransliterated: "Iouda", testament: "NT", groupName: "Allgemeine Briefe", groupColor: ALLG_BRIEFE, orderIndex: 65, chapterCount: 1, summary: "Aufruf zum Glaubenskampf" },
 
-  // === Offenbarung ===
-  { id: 66, abbr: "Off", nameDe: "Offenbarung", nameOriginal: "Ἀποκάλυψις Ἰωάννου", nameOriginalTransliterated: "Apokalypsis Iōannou", testament: "NT", groupName: "Offenbarung", groupColor: OFFENBARUNG, orderIndex: 66, chapterCount: 22, summary: "Vollendung aller Dinge in Christus" },
+  // === Prophetie ===
+  { id: 66, abbr: "Off", nameDe: "Offenbarung", nameOriginal: "Ἀποκάλυψις Ἰωάννου", nameOriginalTransliterated: "Apokalypsis Iōannou", testament: "NT", groupName: "Prophetie", groupColor: PROPHETIE, orderIndex: 66, chapterCount: 22, summary: "Vollendung aller Dinge in Christus" },
 ];
