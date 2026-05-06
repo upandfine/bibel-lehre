@@ -82,6 +82,48 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+/**
+ * Längste aufsteigende Teilsequenz: gibt die Indizes der Elemente zurück,
+ * die zusammen die längste streng aufsteigende Sub-Sequenz bilden.
+ *
+ * Wird in der Sortier-Auswertung benutzt: Bücher, deren Index in dieser
+ * Menge ist, stehen relativ zueinander in richtiger kanonischer Reihenfolge.
+ * O(n²), bei max. 39 Büchern absolut unkritisch.
+ */
+function lisIndices(arr: number[]): Set<number> {
+  const n = arr.length;
+  if (n === 0) return new Set();
+
+  const len = new Array(n).fill(1);
+  const prev = new Array(n).fill(-1);
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < i; j++) {
+      if (arr[j] < arr[i] && len[j] + 1 > len[i]) {
+        len[i] = len[j] + 1;
+        prev[i] = j;
+      }
+    }
+  }
+
+  let maxLen = 0;
+  let maxIdx = 0;
+  for (let i = 0; i < n; i++) {
+    if (len[i] > maxLen) {
+      maxLen = len[i];
+      maxIdx = i;
+    }
+  }
+
+  const result = new Set<number>();
+  let k = maxIdx;
+  while (k !== -1) {
+    result.add(k);
+    k = prev[k];
+  }
+  return result;
+}
+
 /** Vergleichsfreundliche Form: lowercase, ohne Akzente, ohne Whitespace/Satzzeichen. */
 function normalize(s: string): string {
   return s
@@ -859,19 +901,21 @@ function ResultStep({
     );
   }
 
+  if (mode === "sort") {
+    return (
+      <SortResult
+        books={books}
+        userOrder={userOrder}
+        onAgain={onAgain}
+        onReset={onReset}
+      />
+    );
+  }
+
   const byId = new Map(books.map((b) => [b.id, b]));
 
-  // Pro Position: war die Antwort an dieser Position richtig?
+  // Schreib-Modus: pro Position positionsgenauer Vergleich gegen Soll.
   const evaluations = books.map((expected, idx) => {
-    if (mode === "sort") {
-      const placedId = userOrder[idx];
-      const placed = byId.get(placedId);
-      return {
-        expected,
-        userLabel: placed?.nameDe ?? "—",
-        isCorrect: placedId === expected.id,
-      };
-    }
     const input = userInputs[idx] ?? "";
     return {
       expected,
@@ -931,6 +975,97 @@ function ResultStep({
             </div>
           </li>
         ))}
+      </ol>
+
+      <ResultActions onAgain={onAgain} onReset={onReset} />
+    </div>
+  );
+}
+
+function SortResult({
+  books,
+  userOrder,
+  onAgain,
+  onReset,
+}: {
+  books: Book[];
+  userOrder: number[];
+  onAgain: () => void;
+  onReset: () => void;
+}) {
+  const byId = new Map(books.map((b) => [b.id, b]));
+  const userBooks = userOrder
+    .map((id) => byId.get(id))
+    .filter((b): b is Book => Boolean(b));
+
+  // LIS auf den orderIndex-Werten in der User-Reihenfolge: alle Bücher mit
+  // Index in dieser Menge stehen relativ zueinander in passender Reihenfolge.
+  const orderIndices = userBooks.map((b) => b.orderIndex);
+  const lisSet = lisIndices(orderIndices);
+
+  // Soll-Position innerhalb der gewählten Auswahl (1..N), nicht globaler Index.
+  const positionInBooks = new Map(books.map((b, i) => [b.id, i + 1]));
+
+  const total = userBooks.length;
+  const correctCount = lisSet.size;
+  const percent = total > 0 ? Math.round((correctCount / total) * 100) : 0;
+  const misplacedCount = total - correctCount;
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-xl border bg-card p-5">
+        <p className="text-sm text-muted-foreground">Ergebnis</p>
+        <p className="mt-1 font-serif text-2xl font-semibold">
+          {correctCount} von {total} in passender Reihenfolge{" "}
+          <span className="text-muted-foreground">({percent}%)</span>
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {misplacedCount === 0
+            ? "Kein Buch verschoben."
+            : `${misplacedCount} ${
+                misplacedCount === 1 ? "Buch ist" : "Bücher sind"
+              } verschoben — die anderen stehen relativ zueinander richtig.`}
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {encouragement(percent)}
+        </p>
+      </div>
+
+      <ol className="space-y-1.5">
+        {userBooks.map((book, idx) => {
+          const isCorrect = lisSet.has(idx);
+          const correctPos = positionInBooks.get(book.id);
+          return (
+            <li
+              key={book.id}
+              className={cn(
+                "flex items-start gap-3 rounded-md border p-2 pr-3",
+                isCorrect
+                  ? "border-green-200 bg-green-50/60 dark:border-green-900/40 dark:bg-green-950/20"
+                  : "border-red-200 bg-red-50/60 dark:border-red-900/40 dark:bg-red-950/20",
+              )}
+            >
+              <span className="mt-0.5 w-7 shrink-0 text-right text-sm tabular-nums text-muted-foreground">
+                {idx + 1}.
+              </span>
+              <span className="mt-0.5 shrink-0">
+                {isCorrect ? (
+                  <Check className="h-4 w-4 text-green-700 dark:text-green-400" />
+                ) : (
+                  <X className="h-4 w-4 text-red-700 dark:text-red-400" />
+                )}
+              </span>
+              <div className="flex-1">
+                <BookCardInline book={book} />
+                {!isCorrect && correctPos !== undefined && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Kanonisch an Position {correctPos}.
+                  </p>
+                )}
+              </div>
+            </li>
+          );
+        })}
       </ol>
 
       <ResultActions onAgain={onAgain} onReset={onReset} />
