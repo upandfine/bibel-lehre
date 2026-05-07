@@ -95,7 +95,10 @@ export async function getDueVerses(): Promise<DueVerse[]> {
       and(
         eq(userProgress.userId, userId),
         eq(userProgress.sourceType, "verse"),
-        eq(userProgress.sourceId, verseLearnItems.id),
+        // UUID (verse_learn_items.id) muss explizit nach text gecastet werden,
+        // weil userProgress.source_id varchar ist (Polymorphie für mehrere Quell-
+        // Typen, davon haben nicht alle UUIDs).
+        sql`${userProgress.sourceId} = ${verseLearnItems.id}::text`,
       ),
     )
     .where(
@@ -159,7 +162,7 @@ export async function getVerseStats() {
       and(
         eq(userProgress.userId, userId),
         eq(userProgress.sourceType, "verse"),
-        eq(userProgress.sourceId, verseLearnItems.id),
+        sql`${userProgress.sourceId} = ${verseLearnItems.id}::text`,
       ),
     )
     .where(
@@ -180,7 +183,7 @@ export async function getVerseStats() {
       and(
         eq(userProgress.userId, userId),
         eq(userProgress.sourceType, "verse"),
-        eq(userProgress.sourceId, verseLearnItems.id),
+        sql`${userProgress.sourceId} = ${verseLearnItems.id}::text`,
       ),
     )
     .where(
