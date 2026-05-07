@@ -618,20 +618,20 @@ function SortableBookRow({
     >
       <button
         type="button"
-        className="cursor-grab touch-none rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground active:cursor-grabbing"
+        className="-my-1 inline-flex h-9 w-9 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground active:cursor-grabbing"
         {...attributes}
         {...listeners}
         aria-label="Zum Sortieren ziehen"
       >
-        <GripVertical className="h-4 w-4" />
+        <GripVertical className="h-5 w-5" />
       </button>
-      <span className="w-7 shrink-0 text-right text-sm tabular-nums text-muted-foreground">
+      <span className="w-6 shrink-0 text-right text-sm tabular-nums text-muted-foreground">
         {index}.
       </span>
       <button
         type="button"
         onClick={onClick}
-        className="-mx-1 flex-1 rounded px-1 py-0.5 text-left hover:bg-accent/50"
+        className="-mx-1 flex-1 rounded px-1 py-1 text-left hover:bg-accent/50"
         aria-label={`Suche unter ${book.nameDe} öffnen`}
       >
         <BookCardInline book={book} showColor={false} />
@@ -688,7 +688,7 @@ function SortSearchPanel({
           autoFocus
           autoComplete="off"
           spellCheck={false}
-          className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+          className="min-w-0 flex-1 bg-transparent text-base outline-none sm:text-sm"
         />
         <button
           type="button"
@@ -795,7 +795,7 @@ function WriteStep({
               autoComplete="off"
               autoCapitalize="off"
               spellCheck={false}
-              className="flex-1 rounded-sm bg-transparent px-2 py-1 text-sm outline-none focus:bg-accent"
+              className="flex-1 rounded-sm bg-transparent px-2 py-2 text-base outline-none focus:bg-accent sm:py-1 sm:text-sm"
               placeholder="..."
             />
           </li>

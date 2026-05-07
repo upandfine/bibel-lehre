@@ -292,7 +292,7 @@ function SortableChip({ book }: { book: Book }) {
       {...attributes}
       {...listeners}
       className={cn(
-        "cursor-grab touch-none rounded-md border bg-card px-2.5 py-1 text-sm shadow-sm hover:bg-accent active:cursor-grabbing",
+        "min-h-9 cursor-grab touch-none rounded-md border bg-card px-3 py-1.5 text-sm shadow-sm hover:bg-accent active:cursor-grabbing",
         isDragging && "opacity-30",
       )}
       aria-label={`${book.nameDe} ziehen`}
@@ -385,12 +385,12 @@ function SortableSectionRow({ book, index }: { book: Book; index: number }) {
     >
       <button
         type="button"
-        className="cursor-grab touch-none rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground active:cursor-grabbing"
+        className="inline-flex h-8 w-8 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground active:cursor-grabbing"
         {...attributes}
         {...listeners}
         aria-label={`${book.nameDe} ziehen`}
       >
-        <GripVertical className="h-3.5 w-3.5" />
+        <GripVertical className="h-4 w-4" />
       </button>
       <span className="w-5 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
         {index}.

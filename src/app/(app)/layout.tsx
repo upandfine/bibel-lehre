@@ -24,7 +24,9 @@ export default async function AppLayout({
         userName={session.user.name ?? null}
         userRole={session.user.role}
       />
-      <main className="container mx-auto max-w-5xl px-4 py-8">{children}</main>
+      <main className="mx-auto max-w-5xl px-3 py-6 sm:px-4 sm:py-8">
+        {children}
+      </main>
     </>
   );
 }
