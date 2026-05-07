@@ -631,7 +631,7 @@ function SortableBookRow({
       <button
         type="button"
         onClick={onClick}
-        className="-mx-1 flex-1 rounded px-1 py-1 text-left hover:bg-accent/50"
+        className="min-w-0 flex-1 rounded py-1 text-left hover:bg-accent/50"
         aria-label={`Suche unter ${book.nameDe} öffnen`}
       >
         <BookCardInline book={book} showColor={false} />
