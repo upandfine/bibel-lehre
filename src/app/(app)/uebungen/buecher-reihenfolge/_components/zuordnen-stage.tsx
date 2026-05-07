@@ -1,6 +1,7 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   DndContext,
   DragOverlay,
@@ -25,45 +26,37 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowLeft, GripVertical } from "lucide-react";
+import { GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BookCardInline } from "./book-card";
+import { DropIndicator } from "./drop-indicator";
 import {
-  DropIndicator,
   POOL_ID,
-  BookCardInline,
+  storageKeyFor,
   type AssignmentMap,
   type Book,
-} from "./exercise";
+} from "./types";
+import { emptyAssignments, groupsInOrder } from "./utils";
 
-/**
- * Pointer-First Collision-Detection für Multi-Container.
- * `pointerWithin` triggert auch über leeren Containern (im Gegensatz zu `closestCorners`,
- * das auf Items abzielt). Falls der Pointer mal außerhalb aller Container ist,
- * fällt es auf `rectIntersection` zurück.
- */
 const collisionDetection: CollisionDetection = (args) => {
   const pointerCollisions = pointerWithin(args);
   if (pointerCollisions.length > 0) return pointerCollisions;
   return rectIntersection(args);
 };
 
-type Props = {
-  books: Book[];
-  groups: string[];
-  assignments: AssignmentMap;
-  onChange: (next: AssignmentMap) => void;
-  onCheck: () => void;
-  onBack: () => void;
-};
-
-export function ZuordnenStep({
+export function ZuordnenStage({
   books,
-  groups,
-  assignments,
-  onChange,
-  onCheck,
-  onBack,
-}: Props) {
+  testament,
+}: {
+  books: Book[];
+  testament: "AT" | "NT";
+}) {
+  const router = useRouter();
+  const [assignments, setAssignments] = useState<AssignmentMap>(() =>
+    emptyAssignments(books),
+  );
+  const groups = useMemo(() => groupsInOrder(books), [books]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, {
@@ -74,9 +67,10 @@ export function ZuordnenStep({
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const [overId, setOverId] = useState<UniqueIdentifier | null>(null);
 
-  const byId = new Map(books.map((b) => [b.id, b]));
-  const colorByGroup = new Map(
-    books.map((b) => [b.groupName, b.groupColor ?? null]),
+  const byId = useMemo(() => new Map(books.map((b) => [b.id, b])), [books]);
+  const colorByGroup = useMemo(
+    () => new Map(books.map((b) => [b.groupName, b.groupColor ?? null])),
+    [books],
   );
 
   function findContainer(id: UniqueIdentifier): string | null {
@@ -87,11 +81,6 @@ export function ZuordnenStep({
     return null;
   }
 
-  /**
-   * Bestimmt für einen bestimmten Section-Container, an welcher Position
-   * (0-basiert) die Drop-Linie erscheinen soll. null = kein Indicator in
-   * diesem Container.
-   */
   function getInsertionIndexFor(
     containerId: string,
     containerItems: number[],
@@ -101,13 +90,11 @@ export function ZuordnenStep({
     if (overContainer !== containerId) return null;
     const activeContainer = findContainer(activeId);
 
-    // Cross-Container-Drop: Item kommt aus einem anderen Container
     if (activeContainer !== containerId) {
       if (typeof overId === "string") return containerItems.length;
       return containerItems.indexOf(overId as number);
     }
 
-    // Innerhalb desselben Containers reordern
     if (typeof overId === "string") return containerItems.length;
     if (activeId === overId) return null;
     const fromIdx = containerItems.indexOf(activeId as number);
@@ -120,16 +107,13 @@ export function ZuordnenStep({
     setActiveId(event.active.id);
     setOverId(event.active.id);
   }
-
   function handleDragOver(event: DragOverEvent) {
     setOverId(event.over?.id ?? null);
   }
-
   function handleDragCancel() {
     setActiveId(null);
     setOverId(null);
   }
-
   function handleDragEnd(event: DragEndEvent) {
     setActiveId(null);
     setOverId(null);
@@ -145,7 +129,7 @@ export function ZuordnenStep({
       const oldIndex = items.indexOf(active.id as number);
       const newIndex = items.indexOf(over.id as number);
       if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-        onChange({
+        setAssignments({
           ...assignments,
           [fromContainer]: arrayMove(items, oldIndex, newIndex),
         });
@@ -153,7 +137,6 @@ export function ZuordnenStep({
       return;
     }
 
-    // Über Container-Grenzen: Item entfernen und am Zielindex einfügen
     const fromItems = assignments[fromContainer].filter(
       (id) => id !== active.id,
     );
@@ -162,20 +145,35 @@ export function ZuordnenStep({
       typeof over.id === "string"
         ? toItems.length
         : toItems.indexOf(over.id as number);
-    toItems.splice(overIndex < 0 ? toItems.length : overIndex, 0, active.id as number);
+    toItems.splice(
+      overIndex < 0 ? toItems.length : overIndex,
+      0,
+      active.id as number,
+    );
 
-    onChange({
+    setAssignments({
       ...assignments,
       [fromContainer]: fromItems,
       [toContainer]: toItems,
     });
   }
 
+  function handleCheck() {
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem(
+        storageKeyFor(testament, "zuordnen"),
+        JSON.stringify({ mode: "zuordnen", assignments }),
+      );
+    }
+    router.push(
+      `/uebungen/buecher-reihenfolge/${testament}/zuordnen/auswertung`,
+    );
+  }
+
   const poolItems = assignments[POOL_ID] ?? [];
 
   return (
     <div className="space-y-4">
-      <BackButton onClick={onBack} />
       <p className="text-sm text-muted-foreground">
         Ziehe jedes Buch in den passenden Abschnitt — und sortiere es innerhalb
         des Abschnitts in der kanonischen Reihenfolge.
@@ -223,7 +221,7 @@ export function ZuordnenStep({
         </p>
         <button
           type="button"
-          onClick={onCheck}
+          onClick={handleCheck}
           className="rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
         >
           Prüfen
@@ -232,10 +230,6 @@ export function ZuordnenStep({
     </div>
   );
 }
-
-// ====================================================================
-// Pool — horizontaler "Vorrat" der noch zuzuordnenden Bücher
-// ====================================================================
 
 function PoolContainer({
   items,
@@ -302,10 +296,6 @@ function SortableChip({ book }: { book: Book }) {
   );
 }
 
-// ====================================================================
-// Abschnitt-Box
-// ====================================================================
-
 function SectionContainer({
   id,
   title,
@@ -319,7 +309,6 @@ function SectionContainer({
   color: string | null;
   items: number[];
   byId: Map<number, Book>;
-  /** Position der Drop-Linie in dieser Box (null = keine Linie zeigen). */
   insertionIndex: number | null;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
@@ -400,28 +389,12 @@ function SortableSectionRow({ book, index }: { book: Book; index: number }) {
   );
 }
 
-/**
- * Was während des Drags am Cursor schwebt — bewusst groß und konsistent,
- * damit der User die Buchkarte gut sehen kann, egal woher gezogen wurde.
- */
 function DragOverlayCard({ book }: { book: Book }) {
   return (
     <div className="flex cursor-grabbing items-center gap-2 rounded-md border-2 border-foreground/30 bg-card p-1.5 pr-2 shadow-2xl">
       <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
-      <BookCardInline book={book} showColor={false} />
+      <BookCardInline book={book} />
     </div>
   );
 }
 
-function BackButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-    >
-      <ArrowLeft className="h-3.5 w-3.5" />
-      Zurück
-    </button>
-  );
-}
