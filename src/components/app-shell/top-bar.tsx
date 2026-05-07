@@ -117,8 +117,13 @@ function MobileDrawer({
         aria-hidden
       />
 
-      {/* Sheet von links — bg-card (hsl 0 0% 100%) sicher opak gegenüber bg-background, das in HSL nahezu identisch zum Body-Hintergrund ist */}
-      <div className="relative h-full w-72 max-w-[85%] bg-card shadow-2xl">
+      {/* Sheet von links. bg-white als Tailwind-Default ohne CSS-Variable — die
+          shadcn-Token bg-card / bg-background haben sich in dieser Konstellation
+          nicht zuverlässig opak gerendert. */}
+      <div
+        className="relative h-full w-72 max-w-[85%] bg-white shadow-2xl"
+        style={{ backgroundColor: "#ffffff" }}
+      >
         <div className="flex h-14 items-center justify-between border-b px-4">
           <span className="font-serif text-lg font-semibold tracking-tight">
             Bib-Inside
