@@ -64,7 +64,7 @@ export function WriteStage({
         ))}
       </ol>
 
-      <div className="sticky bottom-4 flex justify-end pt-2">
+      <div className="sticky bottom-0 -mx-3 mt-2 flex items-center justify-end gap-3 border-t bg-background/95 px-3 py-3 backdrop-blur sm:-mx-4 sm:px-4">
         <button
           type="button"
           onClick={handleCheck}

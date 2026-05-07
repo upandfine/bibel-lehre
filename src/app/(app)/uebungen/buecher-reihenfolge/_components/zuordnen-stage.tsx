@@ -213,8 +213,8 @@ export function ZuordnenStage({
         </DragOverlay>
       </DndContext>
 
-      <div className="sticky bottom-4 flex items-center justify-between pt-2">
-        <p className="text-xs text-muted-foreground">
+      <div className="sticky bottom-0 -mx-3 mt-2 flex items-center justify-between gap-3 border-t bg-background/95 px-3 py-3 backdrop-blur sm:-mx-4 sm:px-4">
+        <p className="text-sm text-muted-foreground">
           {poolItems.length === 0
             ? "Alle Bücher zugeordnet."
             : `Noch ${poolItems.length} im Pool.`}
