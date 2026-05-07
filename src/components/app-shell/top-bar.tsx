@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SignOutButton } from "./sign-out-button";
@@ -74,13 +75,15 @@ export function TopBar({ userEmail, userName, userRole }: TopBarProps) {
         <UserMenu email={userEmail} name={userName} role={userRole} />
       </div>
 
-      {mobileOpen && (
-        <MobileDrawer
-          items={navItems}
-          isActive={isActive}
-          onClose={() => setMobileOpen(false)}
-        />
-      )}
+      {mobileOpen &&
+        createPortal(
+          <MobileDrawer
+            items={navItems}
+            isActive={isActive}
+            onClose={() => setMobileOpen(false)}
+          />,
+          document.body,
+        )}
     </header>
   );
 }
