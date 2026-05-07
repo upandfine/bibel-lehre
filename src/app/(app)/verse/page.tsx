@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Eye, Pencil } from "lucide-react";
 import { getVerseStats } from "./_actions";
 
 export const metadata: Metadata = {
@@ -29,19 +29,49 @@ export default async function VersePage() {
       </section>
 
       {stats.due > 0 ? (
-        <Link
-          href="/verse/lernen"
-          className="group block rounded-xl border bg-card p-6 transition-colors hover:border-foreground/40 hover:bg-accent"
-        >
-          <p className="text-sm text-muted-foreground">Bereit?</p>
-          <p className="mt-1 font-serif text-xl font-semibold">
-            {stats.due} {stats.due === 1 ? "Vers" : "Verse"} jetzt lernen
+        <section className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Bereit? {stats.due} {stats.due === 1 ? "Vers" : "Verse"} fällig —
+            wähle, wie du heute üben willst.
           </p>
-          <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-foreground">
-            Lern-Session starten
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </span>
-        </Link>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Link
+              href="/verse/lernen"
+              className="group flex flex-col gap-2 rounded-xl border bg-card p-5 transition-colors hover:border-foreground/40 hover:bg-accent"
+            >
+              <div className="flex items-center gap-2">
+                <Eye className="h-4 w-4" />
+                <span className="font-medium">Standard</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Stelle ansehen, im Kopf aufsagen, Vers aufdecken, selbst
+                bewerten.
+              </p>
+              <span className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-foreground">
+                Starten
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </span>
+            </Link>
+
+            <Link
+              href="/verse/lueckentext"
+              className="group flex flex-col gap-2 rounded-xl border bg-card p-5 transition-colors hover:border-foreground/40 hover:bg-accent"
+            >
+              <div className="flex items-center gap-2">
+                <Pencil className="h-4 w-4" />
+                <span className="font-medium">Lückentext</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Ein Teil der Wörter ist ausgeblendet — fülle die Lücken
+                selbst aus.
+              </p>
+              <span className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-foreground">
+                Starten
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </span>
+            </Link>
+          </div>
+        </section>
       ) : (
         <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
           {stats.total === 0 ? (
