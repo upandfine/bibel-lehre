@@ -1,8 +1,8 @@
 "use server";
 
 import { and, asc, eq, isNull, lte, or, sql } from "drizzle-orm";
-import { getServerSession } from "next-auth/next";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { db } from "@/db";
 import {
   bibleBooks,
@@ -10,8 +10,9 @@ import {
   userProgress,
   verseLearnItems,
 } from "@/db/schema";
-import { authOptions } from "@/lib/auth";
-import { initialState, schedule, type SrsGrade } from "@/lib/srs";
+import { validatedAction } from "@/lib/action-helpers";
+import { getUserIdOrThrow } from "@/lib/session";
+import { initialState, schedule } from "@/lib/srs";
 
 /**
  * Vers + (eventuell vorhandener) SRS-Stand pro User. Wenn der User noch nie
@@ -46,13 +47,6 @@ function formatReference(
   return `${abbr} ${chapter},${verseFrom}–${verseTo}`;
 }
 
-async function requireUserId(): Promise<string> {
-  const session = await getServerSession(authOptions);
-  const id = session?.user?.id;
-  if (!id) throw new Error("Nicht eingeloggt");
-  return id;
-}
-
 /**
  * Lädt alle Verse, die für den aktuellen Lerner sichtbar sind und heute
  * fällig zum Lernen sind. „Fällig" heißt:
@@ -63,7 +57,7 @@ async function requireUserId(): Promise<string> {
  * Group-Visibility: später, wenn Gruppen verwaltet werden.
  */
 export async function getDueVerses(): Promise<DueVerse[]> {
-  const userId = await requireUserId();
+  const userId = await getUserIdOrThrow();
   const now = new Date();
 
   const rows = await db
@@ -141,7 +135,7 @@ export async function getDueVerses(): Promise<DueVerse[]> {
  *   neverLearned: davon noch nie bewertet
  */
 export async function getVerseStats() {
-  const userId = await requireUserId();
+  const userId = await getUserIdOrThrow();
   const now = new Date();
 
   const total = await db
@@ -203,66 +197,71 @@ export async function getVerseStats() {
   };
 }
 
+const RecordVerseReviewInput = z.object({
+  verseId: z.string().uuid("verseId muss eine UUID sein"),
+  grade: z.enum(["again", "hard", "good", "easy"]),
+});
+
 /**
  * Speichert eine Bewertung. Wenn der Vers für den User noch keinen
  * userProgress-Eintrag hat, wird er angelegt; sonst aktualisiert.
  */
-export async function recordVerseReview(
-  verseId: string,
-  grade: SrsGrade,
-): Promise<{ success: true }> {
-  const userId = await requireUserId();
+export const recordVerseReview = validatedAction(
+  RecordVerseReviewInput,
+  async ({ verseId, grade }) => {
+    const userId = await getUserIdOrThrow();
 
-  const existing = await db.query.userProgress.findFirst({
-    where: and(
-      eq(userProgress.userId, userId),
-      eq(userProgress.sourceType, "verse"),
-      eq(userProgress.sourceId, verseId),
-    ),
-  });
+    const existing = await db.query.userProgress.findFirst({
+      where: and(
+        eq(userProgress.userId, userId),
+        eq(userProgress.sourceType, "verse"),
+        eq(userProgress.sourceId, verseId),
+      ),
+    });
 
-  const prev = existing
-    ? {
-        easeFactor: existing.easeFactor,
-        intervalDays: existing.intervalDays,
-        repetitions: existing.repetitions,
-      }
-    : initialState();
+    const prev = existing
+      ? {
+          easeFactor: existing.easeFactor,
+          intervalDays: existing.intervalDays,
+          repetitions: existing.repetitions,
+        }
+      : initialState();
 
-  const next = schedule(prev, grade);
+    const next = schedule(prev, grade);
 
-  if (existing) {
-    await db
-      .update(userProgress)
-      .set({
+    if (existing) {
+      await db
+        .update(userProgress)
+        .set({
+          easeFactor: next.easeFactor,
+          intervalDays: next.intervalDays,
+          repetitions: next.repetitions,
+          dueAt: next.dueAt,
+          lastReviewedAt: next.lastReviewedAt,
+          lastGrade: next.lastGrade,
+          totalReviews: existing.totalReviews + 1,
+          correctReviews:
+            existing.correctReviews + (grade === "again" ? 0 : 1),
+        })
+        .where(eq(userProgress.id, existing.id));
+    } else {
+      await db.insert(userProgress).values({
+        userId,
+        sourceType: "verse",
+        sourceId: verseId,
         easeFactor: next.easeFactor,
         intervalDays: next.intervalDays,
         repetitions: next.repetitions,
         dueAt: next.dueAt,
         lastReviewedAt: next.lastReviewedAt,
         lastGrade: next.lastGrade,
-        totalReviews: existing.totalReviews + 1,
-        correctReviews:
-          existing.correctReviews + (grade === "again" ? 0 : 1),
-      })
-      .where(eq(userProgress.id, existing.id));
-  } else {
-    await db.insert(userProgress).values({
-      userId,
-      sourceType: "verse",
-      sourceId: verseId,
-      easeFactor: next.easeFactor,
-      intervalDays: next.intervalDays,
-      repetitions: next.repetitions,
-      dueAt: next.dueAt,
-      lastReviewedAt: next.lastReviewedAt,
-      lastGrade: next.lastGrade,
-      totalReviews: 1,
-      correctReviews: grade === "again" ? 0 : 1,
-    });
-  }
+        totalReviews: 1,
+        correctReviews: grade === "again" ? 0 : 1,
+      });
+    }
 
-  // Übersicht aktualisieren
-  revalidatePath("/verse");
-  return { success: true };
-}
+    // Übersicht aktualisieren
+    revalidatePath("/verse");
+    return { success: true } as const;
+  },
+);

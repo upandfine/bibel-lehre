@@ -18,6 +18,7 @@ import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { sessions, users } from "@/db/schema";
+import { SESSION_COOKIE_NAME } from "@/lib/auth-cookies";
 
 const SESSION_DAYS = 30;
 
@@ -38,6 +39,23 @@ function forbidden() {
   );
 }
 
+/**
+ * Schützt vor cross-origin POSTs (CSRF). Server-Actions in Next 14 prüfen das
+ * automatisch — diese Route ist aber eine klassische Route-Handler-API und
+ * muss es selbst tun.
+ */
+function isSameOrigin(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  const host = request.headers.get("host");
+  if (!origin || !host) return false;
+  try {
+    const originHost = new URL(origin).host;
+    return originHost === host;
+  } catch {
+    return false;
+  }
+}
+
 /** GET listet die in der DB vorhandenen User auf — UI zeigt sie als Buttons. */
 export async function GET() {
   if (!isDevLoginEnabled()) return forbidden();
@@ -53,6 +71,12 @@ export async function GET() {
 /** POST { email } — legt eine neue Session an, setzt das NextAuth-Cookie. */
 export async function POST(request: Request) {
   if (!isDevLoginEnabled()) return forbidden();
+  if (!isSameOrigin(request)) {
+    return NextResponse.json(
+      { error: "Cross-origin POST nicht erlaubt." },
+      { status: 403 },
+    );
+  }
 
   const body = await request.json().catch(() => null);
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : null;
@@ -83,9 +107,8 @@ export async function POST(request: Request) {
     expires,
   });
 
-  // Cookie-Name: NextAuth v4 nutzt "next-auth.session-token" auf HTTP,
-  // "__Secure-next-auth.session-token" auf HTTPS. Lokal HTTP → erstes.
-  cookies().set("next-auth.session-token", sessionToken, {
+  // Cookie-Name aus zentraler Konstante. Lokal ist HTTP → unsichere Variante.
+  cookies().set(SESSION_COOKIE_NAME, sessionToken, {
     expires,
     httpOnly: true,
     sameSite: "lax",

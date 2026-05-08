@@ -1,7 +1,5 @@
-import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
 import { TopBar } from "@/components/app-shell/top-bar";
+import { requireUser } from "@/lib/session";
 
 // Alle authentifizierten Routen sind per Definition dynamisch (Cookies, Session,
 // DB-Zugriff). Verhindert dass Next zur Build-Zeit eine DB-Verbindung versucht.
@@ -12,17 +10,14 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    redirect("/sign-in");
-  }
+  const user = await requireUser();
 
   return (
     <>
       <TopBar
-        userEmail={session.user.email ?? ""}
-        userName={session.user.name ?? null}
-        userRole={session.user.role}
+        userEmail={user.email ?? ""}
+        userName={user.name ?? null}
+        userRole={user.role}
       />
       <main className="mx-auto max-w-5xl px-3 py-6 sm:px-4 sm:py-8">
         {children}

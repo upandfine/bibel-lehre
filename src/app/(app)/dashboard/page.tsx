@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, BookOpen, GraduationCap, Sparkles } from "lucide-react";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { getOptionalUser } from "@/lib/session";
 import { getVerseStats } from "../verse/_actions";
 
 export const metadata: Metadata = {
@@ -15,8 +14,8 @@ export default async function DashboardPage({
   searchParams: { msg?: string };
 }) {
   // Layout (app)/layout.tsx hat die Session bereits sichergestellt — hier nur lesen.
-  const session = await getServerSession(authOptions);
-  const name = session?.user.name ?? session?.user.email ?? "Du";
+  const user = await getOptionalUser();
+  const name = user?.name ?? user?.email ?? "Du";
   const firstName = name.split("@")[0].split(" ")[0];
 
   const verseStats = await getVerseStats();

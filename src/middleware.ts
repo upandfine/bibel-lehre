@@ -10,13 +10,14 @@
 
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { SESSION_COOKIE_NAMES } from "@/lib/auth-cookies";
 
 export function middleware(req: NextRequest) {
   // Beide möglichen Cookie-Namen prüfen — robust gegen
   // Reverse-Proxy-Konfigurationen, in denen das Protokoll nicht eindeutig ist.
-  const hasSession =
-    req.cookies.has("__Secure-next-auth.session-token") ||
-    req.cookies.has("next-auth.session-token");
+  const hasSession = SESSION_COOKIE_NAMES.some((name) =>
+    req.cookies.has(name),
+  );
 
   if (!hasSession) {
     const url = new URL("/sign-in", req.url);

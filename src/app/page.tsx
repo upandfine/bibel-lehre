@@ -1,13 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight } from "lucide-react";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { getOptionalUser } from "@/lib/session";
 
 export default async function HomePage() {
   // Eingeloggte direkt aufs Dashboard.
-  const session = await getServerSession(authOptions);
-  if (session?.user) {
+  const user = await getOptionalUser();
+  if (user) {
     redirect("/dashboard");
   }
 

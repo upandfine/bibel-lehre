@@ -100,7 +100,7 @@ export function ClozeSession({ verses }: { verses: DueVerse[] }) {
   function handleGrade(grade: SrsGrade) {
     const verseId = current!.id;
     startTransition(async () => {
-      await recordVerseReview(verseId, grade);
+      await recordVerseReview({ verseId, grade });
       const nextIndex = index + 1;
       setDoneCount((c) => c + 1);
       setIndex(nextIndex);

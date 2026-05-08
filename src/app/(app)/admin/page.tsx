@@ -1,18 +1,12 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { requireAdmin } from "@/lib/session";
 
 export const metadata: Metadata = {
   title: "Admin-Bereich",
 };
 
 export default async function AdminPage() {
-  const session = await getServerSession(authOptions);
-  // Layout (app)/layout.tsx hat Login bereits geprüft — hier Rollen-Schutz.
-  if (session?.user.role !== "admin") {
-    redirect("/dashboard?msg=admin-only");
-  }
+  await requireAdmin();
 
   return (
     <div className="space-y-4">
