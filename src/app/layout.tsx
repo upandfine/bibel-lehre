@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Source_Serif_4 } from "next/font/google";
 import { cn } from "@/lib/utils";
 import "./globals.css";
@@ -24,7 +24,19 @@ export const metadata: Metadata = {
     "Lern-App für strukturierte biblische Lehrkurse — Verse, Bücher-Reihenfolge, Karteikarten und mehr.",
   applicationName: "Bib-Inside",
   authors: [{ name: "Samuel Sommer" }],
-  // PWA wird in Phase 1 hinzugefügt — manifest.json kommt dann hierhin
+  appleWebApp: {
+    capable: true,
+    title: "Bib-Inside",
+    statusBarStyle: "default",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#2d4b86",
+  width: "device-width",
+  initialScale: 1,
+  // Im PWA-Modus auf iPhones bis Notch-Bereich darstellen
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
