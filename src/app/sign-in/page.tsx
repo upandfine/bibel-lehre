@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { DevLoginPanel } from "./dev-login-panel";
 import { SignInForm } from "./sign-in-form";
 
 export const metadata: Metadata = {
@@ -28,6 +29,8 @@ export default function SignInPage() {
         <div className="rounded-xl border bg-card p-6 shadow-sm">
           <SignInForm />
         </div>
+
+        <DevLoginPanel />
       </div>
     </main>
   );
