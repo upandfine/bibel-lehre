@@ -8,11 +8,12 @@ export const metadata: Metadata = {
   title: "Dashboard",
 };
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: { msg?: string };
-}) {
+export default async function DashboardPage(
+  props: {
+    searchParams: Promise<{ msg?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   // Layout (app)/layout.tsx hat die Session bereits sichergestellt — hier nur lesen.
   const user = await getOptionalUser();
   const name = user?.name ?? user?.email ?? "Du";

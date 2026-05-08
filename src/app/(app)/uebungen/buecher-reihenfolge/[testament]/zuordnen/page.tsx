@@ -9,11 +9,12 @@ export const metadata: Metadata = {
   title: "Zuordnen – Bücher der Bibel",
 };
 
-export default async function ZuordnenPage({
-  params,
-}: {
-  params: { testament: string };
-}) {
+export default async function ZuordnenPage(
+  props: {
+    params: Promise<{ testament: string }>;
+  }
+) {
+  const params = await props.params;
   if (!isTestament(params.testament)) notFound();
   const testament = params.testament;
   const books = await loadBooksByTestament(testament);

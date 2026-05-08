@@ -123,7 +123,7 @@ export async function POST(request: Request) {
   });
 
   // Cookie-Name aus zentraler Konstante. Lokal ist HTTP → unsichere Variante.
-  cookies().set(SESSION_COOKIE_NAME, sessionToken, {
+  (await cookies()).set(SESSION_COOKIE_NAME, sessionToken, {
     expires,
     httpOnly: true,
     sameSite: "lax",

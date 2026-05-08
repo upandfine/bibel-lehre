@@ -37,21 +37,23 @@ const modes: Mode[] = [
   },
 ];
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { testament: string };
-}): Promise<Metadata> {
+export async function generateMetadata(
+  props: {
+    params: Promise<{ testament: string }>;
+  }
+): Promise<Metadata> {
+  const params = await props.params;
   if (!isTestament(params.testament)) return { title: "Bücher der Bibel" };
   const label = params.testament === "AT" ? "Altes Testament" : "Neues Testament";
   return { title: `${label} – Bücher der Bibel` };
 }
 
-export default async function BookOrderModePage({
-  params,
-}: {
-  params: { testament: string };
-}) {
+export default async function BookOrderModePage(
+  props: {
+    params: Promise<{ testament: string }>;
+  }
+) {
+  const params = await props.params;
   if (!isTestament(params.testament)) notFound();
   const testament = params.testament;
   const books = await loadBooksByTestament(testament);

@@ -9,11 +9,12 @@ export const metadata: Metadata = {
   title: "Auswertung – Sortieren",
 };
 
-export default async function SortResultPage({
-  params,
-}: {
-  params: { testament: string };
-}) {
+export default async function SortResultPage(
+  props: {
+    params: Promise<{ testament: string }>;
+  }
+) {
+  const params = await props.params;
   if (!isTestament(params.testament)) notFound();
   const testament = params.testament;
   const books = await loadBooksByTestament(testament);

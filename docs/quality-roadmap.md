@@ -172,23 +172,20 @@ Damit wir nicht alles als rot sehen — der Stand ist solide:
 
 **Aufwand:** ~1 h für die wichtigsten Stellen.
 
-### 🟩 H8. Dependabot-Vulnerabilities aufräumen
+### ✅ H8. Dependabot-Vulnerabilities aufräumen — erledigt
 
-**Status nach `pnpm audit --prod`:** 7 Findings (3 high, 4 moderate), alle in **next 14.2.35** und seinen transitiven Deps (postcss):
+Alle 7 vorherigen Findings sind weg. Stand: `pnpm audit --prod` liefert
+„No known vulnerabilities found".
 
-- GHSA-67rr-2x68-c4qr (DoS via cache poisoning) — patched in next 15.5.14+
-- GHSA-ggv3-7p47-pfv8 (SSRF via middleware redirect) — patched in next 15.5.14+
-- GHSA-3x4c-7xq6-9pq8 (next/image cache growth) — patched in next 15.5.14+
-- GHSA-qx2v-qp2m-jg93 (postcss XSS via /style/) — patched in postcss 8.5.10
-
-**Lösung:** **Major-Bump auf Next 15** in eigener Iteration. Bringt App-Router-Breaking-Changes mit (async params, neue Server-Actions-Semantik, geänderte Cache-Defaults). Brauchbares Zeitfenster: 4–6 h für Migration + Test der bestehenden Pages.
-
-**Mitigation bis dahin:**
-- Sliplane terminiert TLS am Edge → DoS-Effekte auf Server-Ebene gemildert
-- Wir nutzen kein next/image bisher → cache-growth-Risiko 0
-- Middleware redirected nur bei fehlender Session → kein User-Input in Redirect-URL → SSRF-Pfad nicht erreichbar
-
-**Aufwand:** ~4–6 h für Next 15-Migration. Erst nach Phase 1 / vor öffentlichem Tester-Beta machen.
+Was passiert ist:
+- **Next 15-Migration** durchgezogen (next 14.2.35 → 15.5.18, react 18 → 19).
+  Async Request APIs via offiziellem `@next/codemod` migriert; ein
+  manueller Fix in `sign-in/error/page.tsx` (Codemod hatte eine Sub-
+  Komponente doppelt async gemacht). Build, Tests, Smoke-Test grün.
+- **Drizzle-Bump** 0.36 → 0.45 (SQL-Injection-Patch).
+- **postcss-Pin** via pnpm-Override `postcss@<8.5.10: ^8.5.14` in
+  package.json — postcss kommt transitiv über next, der Override
+  zwingt die patched Version durchgehend.
 
 ---
 

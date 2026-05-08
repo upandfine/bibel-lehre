@@ -9,11 +9,12 @@ export const metadata: Metadata = {
   title: "Auswertung – Schreiben",
 };
 
-export default async function WriteResultPage({
-  params,
-}: {
-  params: { testament: string };
-}) {
+export default async function WriteResultPage(
+  props: {
+    params: Promise<{ testament: string }>;
+  }
+) {
+  const params = await props.params;
   if (!isTestament(params.testament)) notFound();
   const testament = params.testament;
   const books = await loadBooksByTestament(testament);
