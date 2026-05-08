@@ -23,6 +23,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { routes } from "@/lib/routes";
 import { BookCardInline } from "./book-card";
 import { DropIndicator } from "./drop-indicator";
 import { storageKeyFor, type Book } from "./types";
@@ -118,9 +119,7 @@ export function SortStage({
         JSON.stringify({ mode: "sortieren", userOrder }),
       );
     }
-    router.push(
-      `/uebungen/buecher-reihenfolge/${testament}/sortieren/auswertung`,
-    );
+    router.push(routes.uebungen.bookOrder.result(testament, "sortieren"));
   }
 
   return (

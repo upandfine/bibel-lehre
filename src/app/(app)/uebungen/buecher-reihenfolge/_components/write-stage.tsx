@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { routes } from "@/lib/routes";
 import { storageKeyFor, type Book } from "./types";
 
 export function WriteStage({
@@ -29,9 +30,7 @@ export function WriteStage({
         JSON.stringify({ mode: "schreiben", userInputs }),
       );
     }
-    router.push(
-      `/uebungen/buecher-reihenfolge/${testament}/schreiben/auswertung`,
-    );
+    router.push(routes.uebungen.bookOrder.result(testament, "schreiben"));
   }
 
   return (

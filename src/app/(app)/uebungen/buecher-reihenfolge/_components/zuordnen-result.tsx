@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Shuffle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { routes } from "@/lib/routes";
 import { BookCardInline } from "./book-card";
 import { ResultActions } from "./result-actions";
 import {
@@ -88,7 +89,7 @@ export function ZuordnenResult({
       storageKeyFor(testament, "zuordnen"),
     );
     if (!raw) {
-      router.replace(`/uebungen/buecher-reihenfolge/${testament}/zuordnen`);
+      router.replace(routes.uebungen.bookOrder.play(testament, "zuordnen"));
       return;
     }
     try {
@@ -96,10 +97,10 @@ export function ZuordnenResult({
       if (parsed?.mode === "zuordnen" && parsed.assignments) {
         setAssignments(parsed.assignments);
       } else {
-        router.replace(`/uebungen/buecher-reihenfolge/${testament}/zuordnen`);
+        router.replace(routes.uebungen.bookOrder.play(testament, "zuordnen"));
       }
     } catch {
-      router.replace(`/uebungen/buecher-reihenfolge/${testament}/zuordnen`);
+      router.replace(routes.uebungen.bookOrder.play(testament, "zuordnen"));
     }
   }, [router, testament]);
 
@@ -209,8 +210,8 @@ export function ZuordnenResult({
       </div>
 
       <ResultActions
-        retryHref={`/uebungen/buecher-reihenfolge/${testament}/zuordnen`}
-        selectionHref="/uebungen/buecher-reihenfolge"
+        retryHref={routes.uebungen.bookOrder.play(testament, "zuordnen")}
+        selectionHref={routes.uebungen.bookOrder.selection()}
       />
     </div>
   );

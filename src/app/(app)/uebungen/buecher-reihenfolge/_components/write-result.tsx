@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { routes } from "@/lib/routes";
 import { BookCardInline } from "./book-card";
 import { ResultActions } from "./result-actions";
 import { storageKeyFor, type Book } from "./types";
@@ -25,7 +26,7 @@ export function WriteResult({
       storageKeyFor(testament, "schreiben"),
     );
     if (!raw) {
-      router.replace(`/uebungen/buecher-reihenfolge/${testament}/schreiben`);
+      router.replace(routes.uebungen.bookOrder.play(testament, "schreiben"));
       return;
     }
     try {
@@ -33,10 +34,10 @@ export function WriteResult({
       if (parsed?.mode === "schreiben" && Array.isArray(parsed.userInputs)) {
         setUserInputs(parsed.userInputs);
       } else {
-        router.replace(`/uebungen/buecher-reihenfolge/${testament}/schreiben`);
+        router.replace(routes.uebungen.bookOrder.play(testament, "schreiben"));
       }
     } catch {
-      router.replace(`/uebungen/buecher-reihenfolge/${testament}/schreiben`);
+      router.replace(routes.uebungen.bookOrder.play(testament, "schreiben"));
     }
   }, [router, testament]);
 
@@ -109,8 +110,8 @@ export function WriteResult({
       </ol>
 
       <ResultActions
-        retryHref={`/uebungen/buecher-reihenfolge/${testament}/schreiben`}
-        selectionHref="/uebungen/buecher-reihenfolge"
+        retryHref={routes.uebungen.bookOrder.play(testament, "schreiben")}
+        selectionHref={routes.uebungen.bookOrder.selection()}
       />
     </div>
   );

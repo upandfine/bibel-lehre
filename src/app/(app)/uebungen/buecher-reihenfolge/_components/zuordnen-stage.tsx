@@ -28,6 +28,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { routes } from "@/lib/routes";
 import { BookCardInline } from "./book-card";
 import { DropIndicator } from "./drop-indicator";
 import {
@@ -165,9 +166,7 @@ export function ZuordnenStage({
         JSON.stringify({ mode: "zuordnen", assignments }),
       );
     }
-    router.push(
-      `/uebungen/buecher-reihenfolge/${testament}/zuordnen/auswertung`,
-    );
+    router.push(routes.uebungen.bookOrder.result(testament, "zuordnen"));
   }
 
   const poolItems = assignments[POOL_ID] ?? [];

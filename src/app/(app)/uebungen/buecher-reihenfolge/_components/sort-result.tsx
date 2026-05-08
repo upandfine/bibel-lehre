@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { routes } from "@/lib/routes";
 import { BookCardInline } from "./book-card";
 import { ResultActions } from "./result-actions";
 import { storageKeyFor, type Book } from "./types";
@@ -25,7 +26,7 @@ export function SortResult({
       storageKeyFor(testament, "sortieren"),
     );
     if (!raw) {
-      router.replace(`/uebungen/buecher-reihenfolge/${testament}/sortieren`);
+      router.replace(routes.uebungen.bookOrder.play(testament, "sortieren"));
       return;
     }
     try {
@@ -33,10 +34,10 @@ export function SortResult({
       if (parsed?.mode === "sortieren" && Array.isArray(parsed.userOrder)) {
         setUserOrder(parsed.userOrder);
       } else {
-        router.replace(`/uebungen/buecher-reihenfolge/${testament}/sortieren`);
+        router.replace(routes.uebungen.bookOrder.play(testament, "sortieren"));
       }
     } catch {
-      router.replace(`/uebungen/buecher-reihenfolge/${testament}/sortieren`);
+      router.replace(routes.uebungen.bookOrder.play(testament, "sortieren"));
     }
   }, [router, testament]);
 
@@ -118,8 +119,8 @@ export function SortResult({
       </ol>
 
       <ResultActions
-        retryHref={`/uebungen/buecher-reihenfolge/${testament}/sortieren`}
-        selectionHref="/uebungen/buecher-reihenfolge"
+        retryHref={routes.uebungen.bookOrder.play(testament, "sortieren")}
+        selectionHref={routes.uebungen.bookOrder.selection()}
       />
     </div>
   );

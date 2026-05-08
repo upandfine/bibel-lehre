@@ -1,18 +1,17 @@
 "use server";
 
-import { and, asc, eq, isNull, lte, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { db } from "@/db";
-import {
-  bibleBooks,
-  bibleTranslations,
-  userProgress,
-  verseLearnItems,
-} from "@/db/schema";
 import { validatedAction } from "@/lib/action-helpers";
 import { getUserIdOrThrow } from "@/lib/session";
 import { initialState, schedule } from "@/lib/srs";
+import {
+  findDueVerses,
+  findProgress,
+  getStats,
+  upsertProgress,
+  type DueVerseRow,
+} from "@/lib/repositories/verses";
 
 /**
  * Vers + (eventuell vorhandener) SRS-Stand pro User. Wenn der User noch nie
@@ -47,70 +46,8 @@ function formatReference(
   return `${abbr} ${chapter},${verseFrom}–${verseTo}`;
 }
 
-/**
- * Lädt alle Verse, die für den aktuellen Lerner sichtbar sind und heute
- * fällig zum Lernen sind. „Fällig" heißt:
- *   - kein userProgress-Eintrag (noch nie gelernt) ODER
- *   - userProgress.dueAt <= jetzt
- *
- * Sichtbar = eigener Vers (private) ODER public.
- * Group-Visibility: später, wenn Gruppen verwaltet werden.
- */
-export async function getDueVerses(): Promise<DueVerse[]> {
-  const userId = await getUserIdOrThrow();
-  const now = new Date();
-
-  const rows = await db
-    .select({
-      id: verseLearnItems.id,
-      bookAbbr: bibleBooks.abbr,
-      bookNameDe: bibleBooks.nameDe,
-      chapter: verseLearnItems.chapter,
-      verseFrom: verseLearnItems.verseFrom,
-      verseTo: verseLearnItems.verseTo,
-      text: verseLearnItems.text,
-      translationFullName: bibleTranslations.fullName,
-      attribution: bibleTranslations.attribution,
-      easeFactor: userProgress.easeFactor,
-      intervalDays: userProgress.intervalDays,
-      repetitions: userProgress.repetitions,
-      dueAt: userProgress.dueAt,
-      lastGrade: userProgress.lastGrade,
-      totalReviews: userProgress.totalReviews,
-    })
-    .from(verseLearnItems)
-    .innerJoin(bibleBooks, eq(verseLearnItems.bookId, bibleBooks.id))
-    .innerJoin(
-      bibleTranslations,
-      eq(verseLearnItems.translationId, bibleTranslations.id),
-    )
-    .leftJoin(
-      userProgress,
-      and(
-        eq(userProgress.userId, userId),
-        eq(userProgress.sourceType, "verse"),
-        // UUID (verse_learn_items.id) muss explizit nach text gecastet werden,
-        // weil userProgress.source_id varchar ist (Polymorphie für mehrere Quell-
-        // Typen, davon haben nicht alle UUIDs).
-        sql`${userProgress.sourceId} = ${verseLearnItems.id}::text`,
-      ),
-    )
-    .where(
-      and(
-        or(
-          eq(verseLearnItems.ownerId, userId),
-          eq(verseLearnItems.visibility, "public"),
-        ),
-        or(isNull(userProgress.dueAt), lte(userProgress.dueAt, now)),
-      ),
-    )
-    .orderBy(
-      // Erst die noch nie gelernten, dann die ältesten Fälligkeits-Daten
-      sql`${userProgress.dueAt} NULLS FIRST`,
-      asc(verseLearnItems.createdAt),
-    );
-
-  return rows.map((r) => ({
+function rowToDueVerse(r: DueVerseRow): DueVerse {
+  return {
     id: r.id,
     reference: formatReference(r.bookAbbr, r.chapter, r.verseFrom, r.verseTo),
     bookNameDe: r.bookNameDe,
@@ -125,76 +62,20 @@ export async function getDueVerses(): Promise<DueVerse[]> {
     repetitions: r.repetitions,
     lastGrade: r.lastGrade,
     totalReviews: r.totalReviews ?? 0,
-  }));
+  };
 }
 
-/**
- * Liefert eine grobe Zählung für die Übersichts-Page:
- *   total: Anzahl sichtbarer Verse insgesamt
- *   due: davon heute fällig
- *   neverLearned: davon noch nie bewertet
- */
+/** Verse, die heute fällig sind (sichtbar = eigen oder public). */
+export async function getDueVerses(): Promise<DueVerse[]> {
+  const userId = await getUserIdOrThrow();
+  const rows = await findDueVerses(userId);
+  return rows.map(rowToDueVerse);
+}
+
+/** Total / fällig / nie geübt — eine Query, drei Filter-Aggregate. */
 export async function getVerseStats() {
   const userId = await getUserIdOrThrow();
-  const now = new Date();
-
-  const total = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(verseLearnItems)
-    .where(
-      or(
-        eq(verseLearnItems.ownerId, userId),
-        eq(verseLearnItems.visibility, "public"),
-      ),
-    );
-
-  const due = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(verseLearnItems)
-    .leftJoin(
-      userProgress,
-      and(
-        eq(userProgress.userId, userId),
-        eq(userProgress.sourceType, "verse"),
-        sql`${userProgress.sourceId} = ${verseLearnItems.id}::text`,
-      ),
-    )
-    .where(
-      and(
-        or(
-          eq(verseLearnItems.ownerId, userId),
-          eq(verseLearnItems.visibility, "public"),
-        ),
-        or(isNull(userProgress.dueAt), lte(userProgress.dueAt, now)),
-      ),
-    );
-
-  const neverLearned = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(verseLearnItems)
-    .leftJoin(
-      userProgress,
-      and(
-        eq(userProgress.userId, userId),
-        eq(userProgress.sourceType, "verse"),
-        sql`${userProgress.sourceId} = ${verseLearnItems.id}::text`,
-      ),
-    )
-    .where(
-      and(
-        or(
-          eq(verseLearnItems.ownerId, userId),
-          eq(verseLearnItems.visibility, "public"),
-        ),
-        isNull(userProgress.dueAt),
-      ),
-    );
-
-  return {
-    total: total[0]?.count ?? 0,
-    due: due[0]?.count ?? 0,
-    neverLearned: neverLearned[0]?.count ?? 0,
-  };
+  return getStats(userId);
 }
 
 const RecordVerseReviewInput = z.object({
@@ -211,14 +92,7 @@ export const recordVerseReview = validatedAction(
   async ({ verseId, grade }) => {
     const userId = await getUserIdOrThrow();
 
-    const existing = await db.query.userProgress.findFirst({
-      where: and(
-        eq(userProgress.userId, userId),
-        eq(userProgress.sourceType, "verse"),
-        eq(userProgress.sourceId, verseId),
-      ),
-    });
-
+    const existing = await findProgress(userId, verseId);
     const prev = existing
       ? {
           easeFactor: existing.easeFactor,
@@ -229,38 +103,18 @@ export const recordVerseReview = validatedAction(
 
     const next = schedule(prev, grade);
 
-    if (existing) {
-      await db
-        .update(userProgress)
-        .set({
-          easeFactor: next.easeFactor,
-          intervalDays: next.intervalDays,
-          repetitions: next.repetitions,
-          dueAt: next.dueAt,
-          lastReviewedAt: next.lastReviewedAt,
-          lastGrade: next.lastGrade,
-          totalReviews: existing.totalReviews + 1,
-          correctReviews:
-            existing.correctReviews + (grade === "again" ? 0 : 1),
-        })
-        .where(eq(userProgress.id, existing.id));
-    } else {
-      await db.insert(userProgress).values({
-        userId,
-        sourceType: "verse",
-        sourceId: verseId,
-        easeFactor: next.easeFactor,
-        intervalDays: next.intervalDays,
-        repetitions: next.repetitions,
-        dueAt: next.dueAt,
-        lastReviewedAt: next.lastReviewedAt,
-        lastGrade: next.lastGrade,
-        totalReviews: 1,
-        correctReviews: grade === "again" ? 0 : 1,
-      });
-    }
+    await upsertProgress({
+      userId,
+      verseId,
+      easeFactor: next.easeFactor,
+      intervalDays: next.intervalDays,
+      repetitions: next.repetitions,
+      dueAt: next.dueAt,
+      lastReviewedAt: next.lastReviewedAt,
+      lastGrade: next.lastGrade,
+      countAsCorrect: grade !== "again",
+    });
 
-    // Übersicht aktualisieren
     revalidatePath("/verse");
     return { success: true } as const;
   },
