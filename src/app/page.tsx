@@ -1,20 +1,37 @@
-export default function HomePage() {
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { ArrowRight } from "lucide-react";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+
+export default async function HomePage() {
+  // Eingeloggte direkt aufs Dashboard.
+  const session = await getServerSession(authOptions);
+  if (session?.user) {
+    redirect("/dashboard");
+  }
+
   return (
-    <main className="container mx-auto flex min-h-screen flex-col items-center justify-center px-4 py-16">
-      <div className="max-w-2xl space-y-6 text-center">
-        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+    <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-4 py-16">
+      <div className="space-y-7 text-center">
+        <h1 className="font-serif text-4xl font-bold tracking-tight sm:text-5xl">
           Bib-Inside
         </h1>
         <p className="text-lg text-muted-foreground">
           Lern-App für strukturierte biblische Lehrkurse — Verse, Bücher-Reihenfolge,
           Karteikarten und mehr.
         </p>
-        <div className="rounded-lg border bg-card p-6 text-left text-sm text-card-foreground">
-          <p className="font-medium">Setup steht.</p>
-          <p className="mt-2 text-muted-foreground">
-            Nächste Schritte: Auth.js konfigurieren, erste Migrations laufen lassen,
-            Bibelbücher als Seed importieren, dann das erste Modul „Bibliologie"
-            anlegen.
+
+        <div className="flex flex-col items-center gap-3">
+          <Link
+            href="/sign-in"
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-6 py-3 text-base font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90"
+          >
+            Anmelden
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+          <p className="text-xs text-muted-foreground">
+            Anmeldung passwortlos per E-Mail-Link.
           </p>
         </div>
       </div>

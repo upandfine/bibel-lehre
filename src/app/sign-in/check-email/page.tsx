@@ -24,12 +24,14 @@ export default function CheckEmailPage() {
             <li>Warte ein, zwei Minuten — manchmal dauert es kurz.</li>
           </ul>
         </div>
-        <Link
-          href="/sign-in"
-          className="inline-block text-sm font-medium text-primary hover:underline"
-        >
-          ← Zurück zur Anmeldung
-        </Link>
+        <div className="flex flex-col items-center gap-2">
+          <Link
+            href="/sign-in"
+            className="inline-flex items-center gap-1 rounded-md border bg-background px-4 py-2 text-sm font-medium hover:bg-accent"
+          >
+            Andere Adresse versuchen
+          </Link>
+        </div>
       </div>
     </main>
   );

@@ -11,7 +11,7 @@ export default async function AdminPage() {
   const session = await getServerSession(authOptions);
   // Layout (app)/layout.tsx hat Login bereits geprüft — hier Rollen-Schutz.
   if (session?.user.role !== "admin") {
-    redirect("/dashboard");
+    redirect("/dashboard?msg=admin-only");
   }
 
   return (
