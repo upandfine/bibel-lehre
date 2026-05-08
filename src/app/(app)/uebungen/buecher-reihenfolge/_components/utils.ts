@@ -108,3 +108,41 @@ export function emptyAssignments(books: Book[]): Record<string, number[]> {
   for (const g of groupsInOrder(books)) map[g] = [];
   return map;
 }
+
+/**
+ * Erwartete Buch-IDs einer Gruppe in kanonischer Reihenfolge.
+ * Wird für den Pre-Check der Zuordnen-Übung benötigt — wenn der Lerner
+ * einen Kasten als „fertig" markieren möchte, vergleichen wir damit.
+ */
+export function expectedBookIdsForGroup(
+  groupId: string,
+  books: Book[],
+): number[] {
+  return books
+    .filter((b) => b.groupName === groupId)
+    .sort((a, b) => a.orderIndex - b.orderIndex)
+    .map((b) => b.id);
+}
+
+/**
+ * Prüft, ob die items der Gruppe exakt der kanonischen Reihenfolge der
+ * zugehörigen Bücher entsprechen — d.h. richtige Auswahl UND richtige
+ * Sortierung.
+ *
+ * Bewusst keine differenzierte Diagnose („Reihenfolge falsch", „Buch X
+ * fehlt"): das wäre verkappte Lösungs-Anzeige, der Lerner soll das
+ * Selbst-Erkennen beibehalten. Ein einfaches OK / nicht-OK reicht für
+ * den UX-Zweck (Kasten zuklappen).
+ */
+export function isGroupComplete(
+  items: number[],
+  groupId: string,
+  books: Book[],
+): boolean {
+  const expected = expectedBookIdsForGroup(groupId, books);
+  if (items.length !== expected.length) return false;
+  for (let i = 0; i < items.length; i++) {
+    if (items[i] !== expected[i]) return false;
+  }
+  return true;
+}

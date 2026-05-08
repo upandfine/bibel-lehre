@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   aliasesFor,
+  expectedBookIdsForGroup,
   groupsInOrder,
+  isGroupComplete,
   isInputCorrect,
   lisIndices,
   normalize,
@@ -102,5 +104,52 @@ describe("utils.groupsInOrder", () => {
       "Geschichtsbücher",
       "Lehrbücher",
     ]);
+  });
+});
+
+describe("utils.expectedBookIdsForGroup", () => {
+  const BOOKS: Book[] = [
+    { ...BOOK, id: 3, groupName: "Pentateuch", orderIndex: 3 },
+    { ...BOOK, id: 1, groupName: "Pentateuch", orderIndex: 1 },
+    { ...BOOK, id: 2, groupName: "Pentateuch", orderIndex: 2 },
+    { ...BOOK, id: 10, groupName: "Geschichtsbücher", orderIndex: 6 },
+  ];
+
+  it("liefert nur IDs der Gruppe, in kanonischer Reihenfolge", () => {
+    expect(expectedBookIdsForGroup("Pentateuch", BOOKS)).toEqual([1, 2, 3]);
+  });
+
+  it("liefert leeres Array für unbekannte Gruppe", () => {
+    expect(expectedBookIdsForGroup("Apokryphen", BOOKS)).toEqual([]);
+  });
+});
+
+describe("utils.isGroupComplete", () => {
+  const BOOKS: Book[] = [
+    { ...BOOK, id: 1, groupName: "Pentateuch", orderIndex: 1 },
+    { ...BOOK, id: 2, groupName: "Pentateuch", orderIndex: 2 },
+    { ...BOOK, id: 3, groupName: "Pentateuch", orderIndex: 3 },
+    { ...BOOK, id: 6, groupName: "Geschichtsbücher", orderIndex: 6 },
+  ];
+
+  it("genau die richtigen IDs in genau der richtigen Reihenfolge → true", () => {
+    expect(isGroupComplete([1, 2, 3], "Pentateuch", BOOKS)).toBe(true);
+  });
+
+  it("richtige Bücher, falsche Reihenfolge → false", () => {
+    expect(isGroupComplete([1, 3, 2], "Pentateuch", BOOKS)).toBe(false);
+  });
+
+  it("zu wenige → false", () => {
+    expect(isGroupComplete([1, 2], "Pentateuch", BOOKS)).toBe(false);
+  });
+
+  it("Fremdes Buch dabei → false", () => {
+    expect(isGroupComplete([1, 2, 6], "Pentateuch", BOOKS)).toBe(false);
+  });
+
+  it("leerer Kasten ist nicht komplett (außer die Gruppe ist leer)", () => {
+    expect(isGroupComplete([], "Pentateuch", BOOKS)).toBe(false);
+    expect(isGroupComplete([], "Apokryphen", BOOKS)).toBe(true);
   });
 });

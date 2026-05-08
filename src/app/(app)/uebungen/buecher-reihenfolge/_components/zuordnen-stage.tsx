@@ -26,7 +26,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical } from "lucide-react";
+import { Check, ChevronDown, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { routes } from "@/lib/routes";
 import { BookCardInline } from "./book-card";
@@ -37,7 +37,7 @@ import {
   type AssignmentMap,
   type Book,
 } from "./types";
-import { emptyAssignments, groupsInOrder } from "./utils";
+import { emptyAssignments, groupsInOrder, isGroupComplete } from "./utils";
 
 const collisionDetection: CollisionDetection = (args) => {
   const pointerCollisions = pointerWithin(args);
@@ -68,11 +68,64 @@ export function ZuordnenStage({
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const [overId, setOverId] = useState<UniqueIdentifier | null>(null);
 
+  /**
+   * UX-Optimierung für mobile: Lerner kann einen fertig befüllten Kasten
+   * zuklappen. Beim Klick auf „Fertig?" prüfen wir vorher, ob alle
+   * Bücher der Gruppe in der richtigen Reihenfolge drin sind. Bei OK
+   * kollabiert der Kasten + bekommt einen Haken; bei nicht-OK erscheint
+   * ein neutraler Hinweis (ohne die konkrete Lösung zu spoilern).
+   */
+  const [closedGroups, setClosedGroups] = useState<Set<string>>(
+    () => new Set<string>(),
+  );
+  const [groupHints, setGroupHints] = useState<Record<string, string>>({});
+
+  const expectedCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const b of books) m.set(b.groupName, (m.get(b.groupName) ?? 0) + 1);
+    return m;
+  }, [books]);
+
   const byId = useMemo(() => new Map(books.map((b) => [b.id, b])), [books]);
   const colorByGroup = useMemo(
     () => new Map(books.map((b) => [b.groupName, b.groupColor ?? null])),
     [books],
   );
+
+  function clearHint(groupId: string) {
+    setGroupHints((prev) => {
+      if (!prev[groupId]) return prev;
+      const { [groupId]: _omit, ...rest } = prev;
+      return rest;
+    });
+  }
+
+  function handleTryClose(groupId: string) {
+    const items = assignments[groupId] ?? [];
+    if (isGroupComplete(items, groupId, books)) {
+      setClosedGroups((prev) => {
+        const next = new Set(prev);
+        next.add(groupId);
+        return next;
+      });
+      clearHint(groupId);
+    } else {
+      setGroupHints((prev) => ({
+        ...prev,
+        [groupId]:
+          "Da scheint noch etwas nicht zu passen — schau die Reihenfolge und Zuordnung nochmal an.",
+      }));
+    }
+  }
+
+  function handleReopen(groupId: string) {
+    setClosedGroups((prev) => {
+      const next = new Set(prev);
+      next.delete(groupId);
+      return next;
+    });
+    clearHint(groupId);
+  }
 
   function findContainer(id: UniqueIdentifier): string | null {
     if (typeof id === "string" && id in assignments) return id;
@@ -124,6 +177,11 @@ export function ZuordnenStage({
     const fromContainer = findContainer(active.id);
     const toContainer = findContainer(over.id);
     if (!fromContainer || !toContainer) return;
+
+    // Sobald sich an einem Container etwas ändert, ist ein eventueller
+    // alter Hint nicht mehr relevant.
+    clearHint(fromContainer);
+    clearHint(toContainer);
 
     if (fromContainer === toContainer) {
       const items = assignments[fromContainer];
@@ -191,6 +249,8 @@ export function ZuordnenStage({
         <div className="grid gap-3 sm:grid-cols-2">
           {groups.map((g) => {
             const items = assignments[g] ?? [];
+            const expected = expectedCounts.get(g) ?? 0;
+            const closed = closedGroups.has(g);
             return (
               <SectionContainer
                 key={g}
@@ -200,6 +260,11 @@ export function ZuordnenStage({
                 items={items}
                 byId={byId}
                 insertionIndex={getInsertionIndexFor(g, items)}
+                expectedCount={expected}
+                closed={closed}
+                hint={groupHints[g] ?? null}
+                onTryClose={() => handleTryClose(g)}
+                onReopen={() => handleReopen(g)}
               />
             );
           })}
@@ -302,6 +367,11 @@ function SectionContainer({
   items,
   byId,
   insertionIndex,
+  expectedCount,
+  closed,
+  hint,
+  onTryClose,
+  onReopen,
 }: {
   id: string;
   title: string;
@@ -309,45 +379,101 @@ function SectionContainer({
   items: number[];
   byId: Map<number, Book>;
   insertionIndex: number | null;
+  expectedCount: number;
+  closed: boolean;
+  hint: string | null;
+  onTryClose: () => void;
+  onReopen: () => void;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id });
-  const showEmptyHint = items.length === 0 && insertionIndex === null;
+  const { setNodeRef, isOver } = useDroppable({ id, disabled: closed });
+  const showEmptyHint =
+    !closed && items.length === 0 && insertionIndex === null;
+  const isFull = items.length === expectedCount && expectedCount > 0;
 
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "flex min-h-[8rem] flex-col rounded-lg border-l-4 bg-card transition-colors",
-        isOver && "ring-2 ring-foreground/20",
+        "flex flex-col rounded-lg border-l-4 bg-card transition-colors",
+        !closed && "min-h-[8rem]",
+        isOver && !closed && "ring-2 ring-foreground/20",
+        closed && "border-emerald-300/70",
       )}
-      style={{ borderLeftColor: color ?? "#94a3b8" }}
+      style={{
+        borderLeftColor: closed ? "#10b981" : (color ?? "#94a3b8"),
+      }}
     >
-      <div className="flex items-center justify-between border-b px-3 py-2">
-        <h3 className="text-sm font-medium">{title}</h3>
-        <span className="text-xs text-muted-foreground">
-          {items.length} {items.length === 1 ? "Buch" : "Bücher"}
-        </span>
-      </div>
-      <SortableContext items={items} strategy={verticalListSortingStrategy}>
-        <ul className="flex flex-1 flex-col gap-1 p-2">
-          <DropIndicator active={insertionIndex === 0} />
-          {items.map((bookId, index) => {
-            const book = byId.get(bookId);
-            if (!book) return null;
-            return (
-              <Fragment key={bookId}>
-                <SortableSectionRow book={book} index={index + 1} />
-                <DropIndicator active={insertionIndex === index + 1} />
-              </Fragment>
-            );
-          })}
-          {showEmptyHint && (
-            <li className="flex flex-1 items-center justify-center px-2 py-3 text-xs italic text-muted-foreground">
-              hierher ziehen
-            </li>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b px-3 py-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          {closed && (
+            <Check
+              className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400"
+              aria-hidden="true"
+            />
           )}
-        </ul>
-      </SortableContext>
+          <h3
+            className={cn(
+              "truncate text-sm font-medium",
+              closed && "text-emerald-700 dark:text-emerald-400",
+            )}
+          >
+            {title}
+          </h3>
+        </div>
+        <span className="text-xs tabular-nums text-muted-foreground">
+          {items.length} / {expectedCount}
+        </span>
+        {closed ? (
+          <button
+            type="button"
+            onClick={onReopen}
+            className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+            aria-label={`${title} wieder öffnen`}
+          >
+            <ChevronDown className="h-3.5 w-3.5" />
+            Erneut anschauen
+          </button>
+        ) : (
+          isFull && (
+            <button
+              type="button"
+              onClick={onTryClose}
+              className="inline-flex items-center gap-1 rounded-md bg-foreground/90 px-2 py-1 text-xs font-medium text-background hover:bg-foreground"
+            >
+              Fertig?
+            </button>
+          )
+        )}
+      </div>
+
+      {!closed && (
+        <SortableContext items={items} strategy={verticalListSortingStrategy}>
+          <ul className="flex flex-1 flex-col gap-1 p-2">
+            <DropIndicator active={insertionIndex === 0} />
+            {items.map((bookId, index) => {
+              const book = byId.get(bookId);
+              if (!book) return null;
+              return (
+                <Fragment key={bookId}>
+                  <SortableSectionRow book={book} index={index + 1} />
+                  <DropIndicator active={insertionIndex === index + 1} />
+                </Fragment>
+              );
+            })}
+            {showEmptyHint && (
+              <li className="flex flex-1 items-center justify-center px-2 py-3 text-xs italic text-muted-foreground">
+                hierher ziehen
+              </li>
+            )}
+          </ul>
+        </SortableContext>
+      )}
+
+      {hint && !closed && (
+        <div className="border-t px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+          {hint}
+        </div>
+      )}
     </div>
   );
 }
