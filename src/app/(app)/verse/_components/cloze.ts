@@ -73,13 +73,16 @@ export function pickGapIndices(
   return new Set(shuffled.slice(0, target));
 }
 
-/** Vergleichsform: lowercase, ohne diakritische Zeichen, ohne Satzzeichen. */
+/**
+ * Vergleichsform: lowercase, ohne diakritische Zeichen, ohne alles
+ * außer Buchstaben und Ziffern.
+ */
 export function normalizeWord(s: string): string {
   return s
     .toLowerCase()
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
-    .replace(/['’`]/g, "");
+    .replace(/[^\p{L}\p{N}]/gu, "");
 }
 
 export function isWordCorrect(input: string, expected: string): boolean {

@@ -53,13 +53,17 @@ export function lisIndices(arr: number[]): Set<number> {
   return result;
 }
 
-/** Vergleichsfreundliche Form: lowercase, ohne Akzente, ohne Whitespace/Satzzeichen. */
+/**
+ * Vergleichsfreundliche Form: lowercase, ohne Diakritika, ohne alles
+ * außer Buchstaben und Ziffern. Damit reagiert die Eingabe-Toleranz
+ * auf beliebige Punktuation, Klammern, Whitespace etc.
+ */
 export function normalize(s: string): string {
   return s
     .toLowerCase()
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
-    .replace(/[\s.,;:'"`\-_]/g, "");
+    .replace(/[^\p{L}\p{N}]/gu, "");
 }
 
 export function aliasesFor(book: Book): string[] {
