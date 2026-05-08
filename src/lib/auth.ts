@@ -14,6 +14,8 @@ import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { Resend } from "resend";
 
 import { db } from "@/db";
+import { log } from "@/lib/log";
+import { consumeRateLimit } from "@/lib/rate-limit";
 import {
   accounts,
   sessions,
@@ -53,12 +55,25 @@ export const authOptions: NextAuthOptions = {
       from: process.env.EMAIL_FROM ?? "Bib-Inside <noreply@send.bib-inside.de>",
       maxAge: validForMinutes * 60,
       async sendVerificationRequest({ identifier: email, url, provider }) {
+        // Rate-Limit pro Email: max 3 Magic-Links in 10 Minuten. Schützt
+        // gegen Magic-Link-Spam (jemand anderes triggert Mails an deine
+        // Adresse) und reduziert Resend-Quota-Verschwendung.
+        const rl = consumeRateLimit("auth.magicLink", email.toLowerCase(), {
+          max: 3,
+          windowMs: 10 * 60 * 1000,
+        });
+        if (!rl.allowed) {
+          // Silent: keinen Versand, kein Error. NextAuth zeigt dem Caller
+          // dasselbe Verhalten wie bei Erfolg, sodass ein Angreifer keine
+          // Email-Existenz aus Antwortzeiten ableiten kann.
+          log.warn("auth.magicLink.rateLimited", { email });
+          return;
+        }
+
         if (!resendClient) {
-          // Im Dev ohne Resend-Key: in Konsole loggen, damit man trotzdem testen kann
-          // eslint-disable-next-line no-console
-          console.warn(
-            `[auth] RESEND_API_KEY nicht gesetzt — Magic-Link für ${email}:\n${url}`,
-          );
+          // Im Dev ohne Resend-Key: Magic-Link in die Logs, damit man
+          // trotzdem testen kann.
+          log.warn("auth.magicLink.consoleFallback", { email, url });
           return;
         }
 

@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Sliplane braucht keine GitHub-Actions, deploy passiert per Webhook bei push.
+# Diese Pipeline ist rein für Qualitäts-Gates: typecheck + tests vor jedem
+# Push auf main werden im PR sichtbar.
+
+jobs:
+  test:
+    name: Typecheck + Unit-Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.3
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit-Tests
+        run: pnpm test
+
+  # E2E mit Postgres-Service. Optional — bremst CI um ~2 Min, kann später
+  # eingeschaltet werden, wenn die ersten Smoke-Tests stabil sind.
+  # e2e:
+  #   name: E2E Smoke-Tests
+  #   runs-on: ubuntu-latest
+  #   needs: test
+  #   services:
+  #     postgres:
+  #       image: postgres:18
+  #       env:
+  #         POSTGRES_USER: bibinside
+  #         POSTGRES_PASSWORD: bibinside
+  #         POSTGRES_DB: bibinside
+  #       ports: ["5432:5432"]
+  #       options: >-
+  #         --health-cmd pg_isready
+  #         --health-interval 10s
+  #         --health-timeout 5s
+  #         --health-retries 5
+  #   env:
+  #     DATABASE_URL: postgres://bibinside:bibinside@localhost:5432/bibinside
+  #     NEXTAUTH_SECRET: test-secret-only-for-ci
+  #     NEXTAUTH_URL: http://localhost:3050
+  #     ENABLE_DEV_LOGIN: "true"
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: pnpm/action-setup@v4
+  #       with: { version: 9.12.3 }
+  #     - uses: actions/setup-node@v4
+  #       with: { node-version: 22, cache: pnpm }
+  #     - run: pnpm install --frozen-lockfile
+  #     - run: pnpm exec playwright install --with-deps chromium
+  #     - run: pnpm db:migrate
+  #     - run: pnpm db:seed
+  #     - run: pnpm test:e2e

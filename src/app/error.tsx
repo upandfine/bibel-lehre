@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { log } from "@/lib/log";
 
 /**
  * Globaler Error-Boundary für unerwartete Render-Fehler. Greift, wenn keine
@@ -15,8 +16,11 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.error("[error.tsx]", error);
+    log.error("page.error.global", {
+      message: error.message,
+      digest: error.digest,
+      name: error.name,
+    });
   }, [error]);
 
   return (

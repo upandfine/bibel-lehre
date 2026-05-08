@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { log } from "@/lib/log";
 
 /**
  * Error-Boundary innerhalb der authentifizierten App-Hülle. Behält die TopBar
@@ -16,8 +17,11 @@ export default function AppError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.error("[(app)/error.tsx]", error);
+    log.error("page.error.app", {
+      message: error.message,
+      digest: error.digest,
+      name: error.name,
+    });
   }, [error]);
 
   const isUnauthorized = error.name === "UnauthorizedError";

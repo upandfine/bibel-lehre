@@ -19,6 +19,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { sessions, users } from "@/db/schema";
 import { SESSION_COOKIE_NAME } from "@/lib/auth-cookies";
+import { clientIpFromRequest, consumeRateLimit } from "@/lib/rate-limit";
 
 const SESSION_DAYS = 30;
 
@@ -75,6 +76,20 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "Cross-origin POST nicht erlaubt." },
       { status: 403 },
+    );
+  }
+
+  // Rate-Limit pro IP. In Dev unwahrscheinlich ein Problem, aber als Layer
+  // zur Vollständigkeit (NODE_ENV-Check ist die eigentliche Production-
+  // Sicherung).
+  const rl = consumeRateLimit("devLogin", clientIpFromRequest(request), {
+    max: 10,
+    windowMs: 5 * 60 * 1000,
+  });
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Zu viele Versuche, bitte später erneut." },
+      { status: 429 },
     );
   }
 

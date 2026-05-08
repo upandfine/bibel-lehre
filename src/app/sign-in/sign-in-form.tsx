@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { signIn } from "next-auth/react";
 import { z } from "zod";
+import { log } from "@/lib/log";
 
 const SignInSchema = z.object({
   email: z.string().email("Bitte eine gültige E-Mail-Adresse eingeben"),
@@ -53,8 +54,9 @@ export function SignInForm() {
 
       setState({ status: "success", email: parsed.data.email });
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error("[sign-in] signIn failed", err);
+      log.error("auth.signIn.fail", {
+        message: err instanceof Error ? err.message : String(err),
+      });
       setState({
         status: "error",
         message:
