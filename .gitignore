@@ -24,6 +24,7 @@ tsconfig.tsbuildinfo
 
 # Claude Code (lokale, persönliche Config)
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
 
 # Logs
 *.log

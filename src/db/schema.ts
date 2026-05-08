@@ -314,6 +314,32 @@ export const courseLessons = pgTable(
   }),
 );
 
+/**
+ * Verse, die zu einer Lektion gehören (z.B. „2.Tim 3,16 auswendig" für
+ * Bibliologie Lektion 1). Verweist auf `verse_learn_items`, damit derselbe
+ * Vers, den der Admin als public im Katalog gepflegt hat, beim Lerner im
+ * SRS-Lernsystem mitgenutzt wird.
+ *
+ * Junction statt JSON-Array, weil wir referenzielle Integrität wollen
+ * (Vers gelöscht → Verbindung zur Lektion automatisch weg).
+ */
+export const courseLessonVerses = pgTable(
+  "course_lesson_verses",
+  {
+    lessonId: uuid("lesson_id")
+      .notNull()
+      .references(() => courseLessons.id, { onDelete: "cascade" }),
+    verseLearnItemId: uuid("verse_learn_item_id")
+      .notNull()
+      .references(() => verseLearnItems.id, { onDelete: "cascade" }),
+    orderIndex: smallint("order_index").notNull().default(0),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.lessonId, t.verseLearnItemId] }),
+    lessonIdx: index("course_lesson_verses_lesson_idx").on(t.lessonId),
+  }),
+);
+
 export const courseSections = pgTable(
   "course_sections",
   {
@@ -601,7 +627,22 @@ export const courseLessonsRelations = relations(courseLessons, ({ one, many }) =
     references: [courseModules.id],
   }),
   sections: many(courseSections),
+  lessonVerses: many(courseLessonVerses),
 }));
+
+export const courseLessonVersesRelations = relations(
+  courseLessonVerses,
+  ({ one }) => ({
+    lesson: one(courseLessons, {
+      fields: [courseLessonVerses.lessonId],
+      references: [courseLessons.id],
+    }),
+    verse: one(verseLearnItems, {
+      fields: [courseLessonVerses.verseLearnItemId],
+      references: [verseLearnItems.id],
+    }),
+  }),
+);
 
 export const courseSectionsRelations = relations(
   courseSections,
@@ -659,6 +700,7 @@ export type NewCourse = typeof courses.$inferInsert;
 
 export type CourseModule = typeof courseModules.$inferSelect;
 export type CourseLesson = typeof courseLessons.$inferSelect;
+export type CourseLessonVerse = typeof courseLessonVerses.$inferSelect;
 export type CourseSection = typeof courseSections.$inferSelect;
 
 export type Task = typeof tasks.$inferSelect;

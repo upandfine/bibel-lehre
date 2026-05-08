@@ -19,6 +19,7 @@ import { db } from "./index";
 import { bibleBooks } from "./schema";
 import { seedAdminUser } from "./seed/admin-user";
 import { seedBibleBooks } from "./seed/books";
+import { seedCourseBibliologie } from "./seed/course-bibliologie";
 import { seedInitialVerses } from "./seed/initial-verses";
 import { seedTranslations } from "./seed/translations";
 
@@ -29,6 +30,7 @@ async function main() {
   await seedBibleBooks();
   const adminId = await seedAdminUser();
   await seedInitialVerses(adminId);
+  await seedCourseBibliologie(adminId);
 
   // Sanity-Check: zählen, was nun in der DB ist
   const counts = await db
@@ -37,6 +39,9 @@ async function main() {
       books: sql<number>`(SELECT COUNT(*) FROM bible_books)`,
       verses: sql<number>`(SELECT COUNT(*) FROM verse_learn_items)`,
       users: sql<number>`(SELECT COUNT(*) FROM users)`,
+      courses: sql<number>`(SELECT COUNT(*) FROM courses)`,
+      lessons: sql<number>`(SELECT COUNT(*) FROM course_lessons)`,
+      tasks: sql<number>`(SELECT COUNT(*) FROM tasks)`,
     })
     .from(bibleBooks)
     .limit(1);

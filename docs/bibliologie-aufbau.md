@@ -161,11 +161,18 @@ Schritt 5: Lehrkurs-Übersicht unter `/lehrkurs`
 - Pro Modul: Fortschritt (X von Y Lektionen abgeschlossen)
 - Klick → Lektionsliste → Sektionen
 
-## Inhaltlich offene Klärungsfragen für Samuel
+## Festlegungen (Samuel, 2026-05-08)
 
-Bevor ich Lektion 1 als Seed eintippe, brauche ich kurze Bestätigung:
-
-1. **Lese-Texte 1:1 abtippen** aus dem Skript — oder paraphrasieren? *(Lizenz/Urheberrecht: das Skript ist von Ewald Gerber für die Christengemeinde Paderborn-Süd geschrieben und „für die Überarbeitung seitens der Ältesten freigegeben". Wenn du Mit-Erarbeiter bist, dürfte 1:1 OK sein. Sonst paraphrasieren.)*
-2. **Modul-Aufgaben** wie „2.Tim 3,16 auswendig" — als eigene Aufgabe-Entity unter dem Modul (nicht unter einer Lektion), oder als Lektions-Aufgabe in einer „Modul-Übersicht"-Lektion?
-3. **Persönliche Reflexion (D2)** — soll der Lerner die wirklich eintippen können, oder nur einen Hinweis „bedenke das in Ruhe" sehen? Im Konzept steht „nie eingereicht, nur privat".
-4. **Lehrer-Material vs. Lerner-Material** — das PDF ist die Teilnehmer-Variante. Gibt es eine Lehrer-Version mit Musterlösungen, die ich für die Auto-Bewertung von B1/C1 nutzen könnte?
+1. **Urheberrecht sauber**: Lese-Texte werden **paraphrasiert**, nicht 1:1
+   abgetippt. Quelle wird im Lehrtext mit Hinweis auf das Original-Skript
+   erwähnt, aber der Wortlaut stammt aus eigener Feder.
+2. **Verse sind separat**: keine Modul-Aufgaben-Entities. Die Verse zu einer
+   Lektion (z.B. „2.Tim 3,16 auswendig") werden über eine Junction-Tabelle
+   `course_lesson_verses (lessonId, verseLearnItemId)` an die Lektion
+   gehängt. Beim Lehrkurs-UI taucht dann pro Lektion ein Block „Verse zu
+   dieser Lektion" auf, der ins reguläre SRS-Vers-Lernen verlinkt.
+3. **D2 Persönliche Reflexion**: **beides** — Eingabefeld vorhanden, mit
+   deutlichem Hinweis „nur für dich, wird nie eingereicht oder geteilt".
+4. **Keine Lehrer-Lösungen jetzt**: B1/C1 → Selbstbewertung durch den
+   Lerner. Optional später nachpflegen, wenn die Älteste die Lösungen
+   freigeben.

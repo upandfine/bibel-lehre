@@ -20,7 +20,14 @@ export const routes = {
   // App-Hülle
   dashboard: () => "/dashboard",
   admin: () => "/admin",
-  lehrkurs: () => "/lehrkurs",
+
+  // Lehrkurs
+  lehrkurs: {
+    overview: () => "/lehrkurs",
+    module: (moduleOrder: number) => `/lehrkurs/${moduleOrder}`,
+    lesson: (moduleOrder: number, lessonOrder: number) =>
+      `/lehrkurs/${moduleOrder}/${lessonOrder}`,
+  },
 
   // Verse
   verse: {
