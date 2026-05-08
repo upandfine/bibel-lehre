@@ -107,15 +107,21 @@ export async function findDueVerses(
 /**
  * Übersichts-Statistiken in einer einzigen Query mit Filter-Aggregation.
  * H6 Optimierung: vorher waren das drei separate Queries.
+ *
+ * Wichtig: Date-Objekte können in Drizzle's `sql`-Template nicht direkt
+ * eingebettet werden — postgres.js wirft dann `TypeError: Received an
+ * instance of Date`. Daher wird `now` einmal nach ISO-String konvertiert
+ * und mit explizitem `::timestamptz`-Cast in den SQL-Filter gegeben.
  */
 export async function getStats(
   userId: string,
   now: Date = new Date(),
 ): Promise<{ total: number; due: number; neverLearned: number }> {
+  const nowIso = now.toISOString();
   const result = await db
     .select({
       total: sql<number>`count(*)::int`,
-      due: sql<number>`count(*) filter (where ${userProgress.dueAt} is null or ${userProgress.dueAt} <= ${now})::int`,
+      due: sql<number>`count(*) filter (where ${userProgress.dueAt} is null or ${userProgress.dueAt} <= ${nowIso}::timestamptz)::int`,
       neverLearned: sql<number>`count(*) filter (where ${userProgress.dueAt} is null)::int`,
     })
     .from(verseLearnItems)

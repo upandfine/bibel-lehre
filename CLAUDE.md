@@ -117,6 +117,32 @@ docker compose up -d   # lokale Postgres
 - Keine Push-Reminder mit Schamfaktor („Du hast deine Streak verloren!").
 - Keine theologischen Eigen-Erweiterungen ohne Rücksprache mit Samuel.
 
+## Pre-Push-Checkliste (verbindlich)
+
+`pnpm build` + `curl /` prüft nur **Server-Side-Rendering**. Crashes auf
+geschützten Routen (DB-Errors, Drizzle-Bugs, Client-Hydration) tauchen erst
+**im Browser nach Auth** auf — und sind unsichtbar für Server-side-Tools.
+
+Vor jedem `git push` (= Auto-Deploy auf Sliplane) gilt diese Reihenfolge:
+
+1. `pnpm typecheck` — TypeScript-Fehler.
+2. `pnpm test` — Vitest-Unit-Tests.
+3. `pnpm build` — Next-Build muss durchlaufen.
+4. **Browser-Verifikation einer geschützten Route**:
+   - Lokal `pnpm dev` (NODE_ENV=development) starten.
+   - Per `/api/dev-login` einloggen.
+   - Mindestens **eine geschützte Route** öffnen (Dashboard, Verse, Übungen).
+   - Browser-Console muss frei von `[error]`-Logs sein.
+   - Bei Major-Bumps (Next, React, Drizzle, postgres.js, NextAuth):
+     **alle drei Bereiche** öffnen — Dashboard, Verse-Lernen, Bücher-Übung.
+5. Erst dann pushen.
+
+**Lessons Learned (2026-05-08)**: Nach Next-15-Migration zeigte HTTP 200 +
+SSR-Render auf `/`, aber `/dashboard` crashte mit Drizzle-`Failed query`
+(postgres.js akzeptiert kein Date-Objekt im `sql\`\``-Template). Server-side
+Tooling sah nur die Error-Boundary, nicht den Crash. Lokaler Browser-Check
+hätte das in 30 Sekunden gefunden.
+
 ## Roadmap (siehe KONZEPT.md Kap. 12)
 
 **Phase 0 ✓ abgeschlossen**: Repo-Skelett, Schema, Auth, Seed.
@@ -142,9 +168,14 @@ docker compose up -d   # lokale Postgres
 - **lizenz-anfragen/** — Mail-Vorlagen für CLV (Schlachter 2000) und SCM/CSV (Elberfelder rev.).
 - **README.md** — Quickstart für lokale Entwicklung.
 
-## Aktueller Status (2026-05-05)
+## Aktueller Status (2026-05-08)
 
-Repo-Skelett steht. NextAuth v4 stable nach Refactor von v5 beta. Auth-Flow funktioniert (Sign-In → Magic-Link → Dashboard). Drizzle-Schema komplett (alle Tabellen aus KONZEPT.md Kap. 9). Seed mit 66 Büchern, 4 Übersetzungen, ~5 Sample-Versen.
+Phase 1 weitgehend offen — Lehrkurs-Editor + Selbststudium fehlen. Bisher
+implementiert: Auth (Magic-Link via Resend), Vers-SRS-Lernen mit Standard-
+und Lückentext-Modus, Bücher-Reihenfolge-Übung in drei Modi (Sortieren,
+Zuordnen, Schreiben), PWA, mobile Navigation. Migration auf Next 15 +
+React 19 + Drizzle 0.45 abgeschlossen. Codebase ist einmal komplett
+refactored (Quality-Roadmap R1–R9, H1–H8, T1–T4 alle abgehakt).
 
 **Verbleibende Aufgaben vor Phase 1**:
 - `pnpm install` lokal frisch ziehen (nach Stack-Refactor)
