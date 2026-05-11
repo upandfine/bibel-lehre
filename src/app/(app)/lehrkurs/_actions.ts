@@ -53,6 +53,13 @@ const SaveMatchInput = z.object({
   matches: z.record(z.string(), z.string()),
 });
 
+const ToggleReadingInput = z.object({
+  taskId: z.string().uuid(),
+  moduleOrder: z.number().int().positive(),
+  lessonOrder: z.number().int().positive(),
+  done: z.boolean(),
+});
+
 /**
  * Holt die aktuelle courseVersion + verifiziert, dass die Aufgabe zum
  * Standard-Course gehört. Verhindert, dass jemand fremde taskIds
@@ -168,5 +175,29 @@ export const saveMatchAnswer = validatedAction(
 
     revalidatePath(routes.lehrkurs.lesson(moduleOrder, lessonOrder));
     return { ok: true as const, isAutoCorrect };
+  },
+);
+
+/**
+ * E4_reading: Lerner markiert eine Lese-Aufgabe als „erledigt" oder hebt
+ * die Markierung wieder auf. Antwort-Payload: `{ done: boolean, doneAt? }`.
+ */
+export const toggleReadingDone = validatedAction(
+  ToggleReadingInput,
+  async ({ taskId, moduleOrder, lessonOrder, done }) => {
+    const userId = await getUserIdOrThrow();
+    const courseVersion = await resolveCourseVersionForTask(taskId);
+
+    await upsertTaskAnswer({
+      userId,
+      taskId,
+      courseVersion,
+      answer: { done, doneAt: done ? new Date().toISOString() : null },
+      isAutoCorrect: null,
+      selfGrade: null,
+    });
+
+    revalidatePath(routes.lehrkurs.lesson(moduleOrder, lessonOrder));
+    return { ok: true as const };
   },
 );

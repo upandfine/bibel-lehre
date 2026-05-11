@@ -12,14 +12,27 @@
  *   - Speicher-Status optimistisch („wird gespeichert..." → „gespeichert ✓")
  */
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
-import { Check, CheckCircle2, Lock, Save, XCircle } from "lucide-react";
+import {
+  ArrowRight,
+  BookOpen,
+  Check,
+  CheckCircle2,
+  ExternalLink,
+  Library,
+  Lock,
+  Save,
+  XCircle,
+} from "lucide-react";
 import {
   saveMatchAnswer,
   saveTextAnswer,
   saveTrueFalseAnswer,
+  toggleReadingDone,
 } from "../_actions";
 import { LessonText } from "./lesson-text";
+import { routes } from "@/lib/routes";
 import type { LessonTask } from "@/lib/repositories/courses";
 
 type TaskRendererProps = {
@@ -32,17 +45,81 @@ type TaskRendererProps = {
 
 export function TaskRenderer(props: TaskRendererProps) {
   switch (props.task.type) {
+    // --- Auto-bewertbar ---
     case "A1_true_false":
       return <TrueFalseTask {...props} />;
     case "A3_match":
       return <MatchTask {...props} />;
+
+    // --- Selbstbewertete Texteingabe (B/C-Typen unterscheiden sich nur in
+    //     Textarea-Höhe und Hint im Placeholder) ---
     case "B1_short_open":
-    case "C1_long_open":
       return <TextTask {...props} variant="short" />;
+    case "B2_list":
+      return (
+        <TextTask
+          {...props}
+          variant="list"
+          placeholder="Ein Eintrag pro Zeile"
+        />
+      );
+    case "B3_definition":
+      return (
+        <TextTask
+          {...props}
+          variant="short"
+          placeholder="Deine Definition…"
+        />
+      );
+    case "B4_verse_meaning":
+      return (
+        <TextTask
+          {...props}
+          variant="short"
+          placeholder="Was sagt die Stelle aus?"
+        />
+      );
+    case "C1_long_open":
+    case "C2_essay":
+    case "C3_compare":
+    case "C4_application":
+    case "C5_summary":
+      return <TextTask {...props} variant="long" />;
+
+    // --- Private Reflexion (D-Typen, immer mit Privat-Hinweis) ---
+    case "D1_personal_meaning":
     case "D2_personal_impact":
+    case "D3_personal_excitement":
       return <TextTask {...props} variant="private" />;
+
+    // --- Verhalten ---
+    case "E1_verse_memorize":
+    case "E2_passage_memorize":
+      return <VerseMemorizeTask {...props} />;
+    case "E3_order_memorize":
+      return <OrderMemorizeTask {...props} />;
+    case "E4_reading":
+      return <ReadingTask {...props} />;
+    case "E5_choice_xor":
+      // XOR-Wahlaufgaben werden über task_groups gesteuert — eine eigene
+      // Renderkomponente folgt mit der task_groups-UI. Vorerst als Hinweis.
+      return (
+        <TaskCard {...props} status="idle">
+          <p className="text-sm text-muted-foreground">
+            Wahlaufgabe — XOR-Logik wird mit dem Task-Groups-System
+            ergänzt.
+          </p>
+        </TaskCard>
+      );
+
+    // --- Sonstiges ---
+    case "F1_external_research":
+      return <ExternalResearchTask {...props} />;
     case "F2_thinking":
       return <ThinkingTask {...props} />;
+
+    // Cloze A2 + Tabelle A4 + Ordering A5 + Choice A6 — kommen im nächsten
+    // Commit als eigene Renderer mit Auto-Bewertung.
     default:
       return (
         <TaskCard {...props} status="idle">
@@ -136,8 +213,17 @@ function StatusBadge({ status }: { status: Status }) {
 }
 
 // ====================================================================
-// B1 / C1 / D2 — Textantwort (mit optionalem „privat"-Hinweis)
+// Text-Antworten — B1/B2/B3/B4 (short/list), C1-C5 (long), D1-D3 (private)
 // ====================================================================
+
+type TextVariant = "short" | "long" | "private" | "list";
+
+const TEXT_ROWS_FOR_VARIANT: Record<TextVariant, number> = {
+  short: 3,
+  long: 6,
+  private: 4,
+  list: 5,
+};
 
 function TextTask({
   task,
@@ -145,7 +231,11 @@ function TextTask({
   lessonOrder,
   number,
   variant,
-}: TaskRendererProps & { variant: "short" | "private" }) {
+  placeholder,
+}: TaskRendererProps & {
+  variant: TextVariant;
+  placeholder?: string;
+}) {
   const initialText =
     typeof (task.answer?.answer as { text?: string } | undefined)?.text === "string"
       ? ((task.answer!.answer as { text: string }).text)
@@ -195,8 +285,8 @@ function TextTask({
           setText(e.target.value);
           if (status === "saved") setStatus("idle");
         }}
-        rows={variant === "private" ? 4 : 3}
-        placeholder="Deine Antwort…"
+        rows={TEXT_ROWS_FOR_VARIANT[variant]}
+        placeholder={placeholder ?? "Deine Antwort…"}
         className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
       />
       <div className="flex justify-end">
@@ -522,5 +612,222 @@ function ThinkingTask({
         bevor du weitermachst.
       </p>
     </TaskCard>
+  );
+}
+
+// ====================================================================
+// F1 — Externe Recherche (Hinweis + optionales Notiz-Feld)
+// ====================================================================
+
+function ExternalResearchTask(props: TaskRendererProps) {
+  return (
+    <TaskCard {...props} status="idle">
+      <div className="flex items-start gap-2 rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+        <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <span>
+          Diese Aufgabe verlangt eine Recherche außerhalb der App — z.B.
+          in einem Bibellexikon oder den empfohlenen Büchern. Die Notiz
+          unten ist nur für dich.
+        </span>
+      </div>
+      <NotesField {...props} placeholder="Deine Notizen aus der Recherche…" />
+    </TaskCard>
+  );
+}
+
+// ====================================================================
+// E1 / E2 — Vers / Versblock auswendig lernen
+// (Verweis auf das eigenständige SRS-Vers-Lernsystem)
+// ====================================================================
+
+function VerseMemorizeTask(props: TaskRendererProps) {
+  return (
+    <TaskCard {...props} status="idle">
+      <div className="flex items-start gap-3 rounded-md border bg-background px-3 py-3">
+        <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">Vers auswendig lernen</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Diese Aufgabe wird über das Vers-Lernsystem (Spaced Repetition)
+            erledigt. Wenn der Vers in deinem Lernpensum ist, taucht er dort
+            automatisch auf.
+          </p>
+          <Link
+            href={routes.verse.overview()}
+            className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+          >
+            Zu Verse lernen
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      </div>
+    </TaskCard>
+  );
+}
+
+// ====================================================================
+// E3 — Reihenfolge auswendig (Bücher der Bibel)
+// (Verweis auf die Bücher-Übung)
+// ====================================================================
+
+function OrderMemorizeTask(props: TaskRendererProps) {
+  return (
+    <TaskCard {...props} status="idle">
+      <div className="flex items-start gap-3 rounded-md border bg-background px-3 py-3">
+        <Library className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">Reihenfolge auswendig</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Die kanonische Reihenfolge der biblischen Bücher übst du in der
+            Bücher-Übung — Sortieren, Zuordnen oder freies Schreiben.
+          </p>
+          <Link
+            href={routes.uebungen.bookOrder.selection()}
+            className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+          >
+            Zur Bücher-Übung
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      </div>
+    </TaskCard>
+  );
+}
+
+// ====================================================================
+// E4 — Reading: Checkbox „gelesen" + optionales Notizfeld
+// ====================================================================
+
+function ReadingTask({
+  task,
+  moduleOrder,
+  lessonOrder,
+  number,
+}: TaskRendererProps) {
+  const stored = task.answer?.answer as { done?: boolean } | undefined;
+  const [done, setDone] = useState<boolean>(stored?.done === true);
+  const [status, setStatus] = useState<Status>(stored?.done ? "saved" : "idle");
+  const [pending, startTransition] = useTransition();
+
+  const toggle = () => {
+    const next = !done;
+    setDone(next);
+    setStatus("saving");
+    startTransition(async () => {
+      try {
+        await toggleReadingDone({
+          taskId: task.id,
+          moduleOrder,
+          lessonOrder,
+          done: next,
+        });
+        setStatus("saved");
+      } catch {
+        setStatus("error");
+        setDone(!next); // optimistisches Update zurückrollen
+      }
+    });
+  };
+
+  return (
+    <TaskCard
+      task={task}
+      moduleOrder={moduleOrder}
+      lessonOrder={lessonOrder}
+      number={number}
+      status={status}
+    >
+      <button
+        type="button"
+        onClick={toggle}
+        disabled={pending}
+        className={
+          "flex w-full items-center gap-3 rounded-md border px-3 py-2.5 text-sm transition-colors disabled:cursor-not-allowed " +
+          (done
+            ? "border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-200"
+            : "bg-background hover:bg-muted")
+        }
+        aria-pressed={done}
+      >
+        <span
+          className={
+            "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 " +
+            (done
+              ? "border-emerald-600 bg-emerald-600 text-white"
+              : "border-muted-foreground/40")
+          }
+        >
+          {done && <Check className="h-3 w-3" />}
+        </span>
+        <span className="text-left">
+          {done ? "Gelesen — du kannst hier später erneut hinklicken." : "Ich habe diesen Abschnitt gelesen."}
+        </span>
+      </button>
+    </TaskCard>
+  );
+}
+
+// ====================================================================
+// NotesField — kleines wiederverwendbares Eingabefeld für Recherche-Notizen
+// ====================================================================
+
+function NotesField({
+  task,
+  moduleOrder,
+  lessonOrder,
+  placeholder,
+}: Omit<TaskRendererProps, "number"> & { placeholder: string }) {
+  const initial =
+    typeof (task.answer?.answer as { text?: string } | undefined)?.text === "string"
+      ? ((task.answer!.answer as { text: string }).text)
+      : "";
+
+  const [text, setText] = useState(initial);
+  const [saved, setSaved] = useState(initial.length > 0);
+  const [pending, startTransition] = useTransition();
+
+  const onSave = () => {
+    startTransition(async () => {
+      try {
+        await saveTextAnswer({
+          taskId: task.id,
+          moduleOrder,
+          lessonOrder,
+          text,
+        });
+        setSaved(true);
+      } catch {
+        setSaved(false);
+      }
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      <textarea
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          if (saved) setSaved(false);
+        }}
+        rows={3}
+        placeholder={placeholder}
+        className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+      />
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-muted-foreground">
+          {saved ? "Notiz gespeichert." : ""}
+        </span>
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={pending || text.trim() === ""}
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Save className="h-3.5 w-3.5" />
+          Speichern
+        </button>
+      </div>
+    </div>
   );
 }
