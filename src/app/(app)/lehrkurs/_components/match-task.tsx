@@ -277,7 +277,7 @@ export function MatchTaskDnD({
       )}
 
       {!revealed && (
-        <div className="mt-2 flex justify-end">
+        <div className="no-print mt-2 flex justify-end">
           <button
             type="button"
             onClick={onSubmit}

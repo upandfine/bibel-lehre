@@ -217,7 +217,7 @@ function TextTask({
         placeholder={placeholder ?? "Deine Antwort…"}
         className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
       />
-      <div className="flex justify-end">
+      <div className="no-print flex justify-end">
         <button
           type="button"
           onClick={onSave}
@@ -346,7 +346,7 @@ function TrueFalseTask({
         })}
       </div>
       {!revealed && (
-        <div className="flex justify-end">
+        <div className="no-print flex justify-end">
           <button
             type="button"
             onClick={onSubmit}
@@ -710,7 +710,7 @@ function ChoiceTask({
         })}
       </div>
       {!revealed && (
-        <div className="flex justify-end">
+        <div className="no-print flex justify-end">
           <button
             type="button"
             onClick={onSubmit}
@@ -872,7 +872,7 @@ function ClozeTask({
         })}
       </p>
       {!revealed && (
-        <div className="flex justify-end">
+        <div className="no-print flex justify-end">
           <button
             type="button"
             onClick={onSubmit}
@@ -1033,7 +1033,7 @@ function OrderingTask({
         </p>
       )}
       {!revealed && (
-        <div className="flex justify-end">
+        <div className="no-print flex justify-end">
           <button
             type="button"
             onClick={onSubmit}

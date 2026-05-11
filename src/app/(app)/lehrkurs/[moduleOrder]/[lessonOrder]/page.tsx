@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/session";
 import { routes } from "@/lib/routes";
 import { DEFAULT_COURSE_SLUG } from "../../_lib/constants";
 import { LessonText } from "../../_components/lesson-text";
+import { PrintButton } from "../../_components/print-button";
 import { ProgressBar } from "../../_components/progress-bar";
 import { TaskRenderer } from "../../_components/task-renderer";
 
@@ -59,21 +60,26 @@ export default async function LessonPage({ params }: Props) {
     <div className="space-y-8">
       <Link
         href={routes.lehrkurs.module(lesson.module.orderIndex)}
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        className="no-print inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />
         {lesson.module.title}
       </Link>
 
       <header className="space-y-3">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">
-          Modul {lesson.module.orderIndex} · Lektion {lesson.orderIndex}
-        </p>
-        <h1 className="font-serif text-3xl font-bold tracking-tight">
-          {lesson.title}
-        </h1>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              Modul {lesson.module.orderIndex} · Lektion {lesson.orderIndex}
+            </p>
+            <h1 className="font-serif text-3xl font-bold tracking-tight">
+              {lesson.title}
+            </h1>
+          </div>
+          <PrintButton />
+        </div>
         {totalCount > 0 && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="no-print flex items-center gap-2 text-xs text-muted-foreground">
             <span>Fortschritt:</span>
             <ProgressBar
               answered={answeredCount}
@@ -103,7 +109,7 @@ export default async function LessonPage({ params }: Props) {
           </ul>
           <Link
             href={routes.verse.overview()}
-            className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+            className="no-print inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
           >
             Zu „Verse lernen"
             <ArrowRight className="h-4 w-4" />
@@ -138,7 +144,7 @@ export default async function LessonPage({ params }: Props) {
         ))}
       </div>
 
-      <nav className="flex items-center justify-between gap-4 border-t pt-6">
+      <nav className="no-print flex items-center justify-between gap-4 border-t pt-6">
         {lesson.navigation.prev ? (
           <Link
             href={routes.lehrkurs.lesson(

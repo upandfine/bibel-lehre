@@ -79,3 +79,68 @@
     @apply font-serif text-lg leading-relaxed;
   }
 }
+
+/* ====================================================================
+   Druck-Styles für Lehrkurs-Lektionen
+   --------------------------------------------------------------------
+   Lerner druckt die Lektion z.B. zum Mitnehmen ins physische Treffen.
+   Wir blenden Navigation, Interaktions-Elemente und Status-Badges aus,
+   damit das gedruckte Blatt wie eine ruhige Arbeits-Vorlage aussieht.
+   --------------------------------------------------------------------
+   - `.no-print` versteckt Elemente komplett (Navigation, Buttons, etc.)
+   - `.print-only` zeigt Elemente nur beim Druck (Zusatz-Hinweise)
+   - Body-Hintergrund weiß, Schrift schwarz, kompakteres Layout
+==================================================================== */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+    /* Etwas kleinere Schrift, mehr Inhalt pro Seite */
+    font-size: 11pt;
+  }
+  /* Container-Margins reduzieren */
+  main {
+    padding: 0 !important;
+  }
+  /* Karten ohne Schatten/Border-Radius — klare Tinte */
+  .rounded-xl,
+  .rounded-md,
+  .rounded-lg {
+    border-radius: 0 !important;
+  }
+  /* Antwort-Felder als Linien dargestellt */
+  textarea,
+  input[type="text"] {
+    border: none !important;
+    border-bottom: 1px solid #999 !important;
+    background: transparent !important;
+    color: transparent !important;
+    min-height: 3em;
+    page-break-inside: avoid;
+  }
+  /* Status-Badges nicht drucken */
+  [class*="rounded-full"] {
+    display: none !important;
+  }
+  /* Seitenumbruch zwischen Sektionen vermeiden, wo möglich */
+  section {
+    page-break-inside: avoid;
+  }
+  /* Aufgaben-Karten nicht auf neue Seite zerreißen */
+  .rounded-xl.border {
+    page-break-inside: avoid;
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+  }
+}
+.print-only {
+  display: none;
+}
+@media print {
+  .print-only {
+    display: block;
+  }
+}
