@@ -18,25 +18,25 @@ import {
   ArrowRight,
   BookOpen,
   Check,
-  CheckCircle2,
   ExternalLink,
   Library,
   Lock,
   Save,
-  XCircle,
 } from "lucide-react";
 import {
   saveChoiceAnswer,
   saveClozeAnswer,
-  saveMatchAnswer,
   saveOrderingAnswer,
   saveTextAnswer,
   saveTrueFalseAnswer,
   toggleReadingDone,
 } from "../_actions";
-import { LessonText } from "./lesson-text";
+import { MatchTaskDnD } from "./match-task";
+import { TaskCard, type TaskCardStatus } from "./task-card";
 import { routes } from "@/lib/routes";
 import type { LessonTask } from "@/lib/repositories/courses";
+
+type Status = TaskCardStatus;
 
 type TaskRendererProps = {
   task: LessonTask;
@@ -138,86 +138,6 @@ export function TaskRenderer(props: TaskRendererProps) {
         </TaskCard>
       );
   }
-}
-
-// ====================================================================
-// TaskCard — gemeinsame Hülle (Header, Prompt, Status)
-// ====================================================================
-
-type Status =
-  | "idle"
-  | "saving"
-  | "saved"
-  | "auto_correct"
-  | "auto_incorrect"
-  | "error";
-
-function TaskCard({
-  task,
-  number,
-  status,
-  children,
-  footer,
-}: TaskRendererProps & {
-  status: Status;
-  children: React.ReactNode;
-  footer?: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-3 rounded-xl border bg-card p-5">
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 font-serif text-xs font-semibold text-primary">
-          {number}
-        </div>
-        <div className="min-w-0 flex-1">
-          <LessonText markdown={task.promptMd} />
-        </div>
-        <StatusBadge status={status} />
-      </div>
-      <div className="ml-9 space-y-3">{children}</div>
-      {footer && <div className="ml-9">{footer}</div>}
-    </div>
-  );
-}
-
-function StatusBadge({ status }: { status: Status }) {
-  if (status === "idle") return null;
-  if (status === "saving") {
-    return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-        speichert…
-      </span>
-    );
-  }
-  if (status === "saved") {
-    return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
-        <Check className="h-3 w-3" />
-        gespeichert
-      </span>
-    );
-  }
-  if (status === "auto_correct") {
-    return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
-        <CheckCircle2 className="h-3 w-3" />
-        richtig
-      </span>
-    );
-  }
-  if (status === "auto_incorrect") {
-    return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/30 dark:text-amber-400">
-        <XCircle className="h-3 w-3" />
-        nochmal anschauen
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-xs text-rose-700 dark:bg-rose-950/30 dark:text-rose-400">
-      Fehler
-    </span>
-  );
 }
 
 // ====================================================================
@@ -472,127 +392,22 @@ function TfButton({
 }
 
 // ====================================================================
-// A3 — match (Dropdown-Variante; Drag&Drop kommt später)
+// A3 — Match (Drag&Drop-Variante in match-task.tsx ausgelagert)
+//
+// Die TaskCard-Hülle bleibt hier, der DnD-Body kommt aus MatchTaskDnD.
+// Status-Anzeige im TaskCard-Header wäre redundant — die TaskCard rendert
+// daher mit "idle", die Status-Information (richtig/falsch) zeigt
+// MatchTaskDnD inline durch die Farbgebung der Slots.
 // ====================================================================
 
-type MatchPair = { left: string; right: string };
-
-function MatchTask({
-  task,
-  moduleOrder,
-  lessonOrder,
-  number,
-}: TaskRendererProps) {
-  const cfg = (task.config as { pairs?: MatchPair[] } | null) ?? {};
-  const pairs = cfg.pairs ?? [];
-  const rightOptions = Array.from(new Set(pairs.map((p) => p.right)));
-
-  const initial =
-    (task.answer?.answer as { matches?: Record<string, string> } | undefined)
-      ?.matches ?? {};
-
-  const [matches, setMatches] = useState<Record<string, string>>(initial);
-  const [revealed, setRevealed] = useState(
-    Object.keys(initial).length === pairs.length && pairs.length > 0,
-  );
-  const [status, setStatus] = useState<Status>(
-    revealed
-      ? pairs.every((p) => initial[p.left] === p.right)
-        ? "auto_correct"
-        : "auto_incorrect"
-      : "idle",
-  );
-  const [pending, startTransition] = useTransition();
-
-  const allAssigned = pairs.every((p) => matches[p.left]);
-
-  const onSubmit = () => {
-    if (!allAssigned) return;
-    setStatus("saving");
-    startTransition(async () => {
-      try {
-        const res = await saveMatchAnswer({
-          taskId: task.id,
-          moduleOrder,
-          lessonOrder,
-          matches,
-        });
-        setStatus(res.isAutoCorrect ? "auto_correct" : "auto_incorrect");
-        setRevealed(true);
-      } catch {
-        setStatus("error");
-      }
-    });
-  };
-
+function MatchTask(props: TaskRendererProps) {
   return (
-    <TaskCard
-      task={task}
-      moduleOrder={moduleOrder}
-      lessonOrder={lessonOrder}
-      number={number}
-      status={status}
-    >
-      <div className="space-y-2">
-        {pairs.map((p) => {
-          const sel = matches[p.left] ?? "";
-          const correct = revealed && sel === p.right;
-          const wrong = revealed && sel !== "" && sel !== p.right;
-          return (
-            <div
-              key={p.left}
-              className={
-                "flex items-center gap-3 rounded-md border px-3 py-2 text-sm " +
-                (correct
-                  ? "border-emerald-300 bg-emerald-50 dark:bg-emerald-950/20"
-                  : wrong
-                    ? "border-amber-300 bg-amber-50 dark:bg-amber-950/20"
-                    : "bg-background")
-              }
-            >
-              <p className="flex-1 font-medium">{p.left}</p>
-              <span className="text-muted-foreground">→</span>
-              <select
-                value={sel}
-                disabled={revealed}
-                onChange={(e) =>
-                  setMatches({ ...matches, [p.left]: e.target.value })
-                }
-                className="rounded-md border bg-background px-2 py-1 text-sm focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                <option value="">— wähle —</option>
-                {rightOptions.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-            </div>
-          );
-        })}
-      </div>
-      {revealed && (
-        <p className="text-xs text-muted-foreground">
-          {pairs
-            .filter((p) => matches[p.left] !== p.right)
-            .map(
-              (p) => `Richtige Zuordnung für „${p.left}": ${p.right}`,
-            )
-            .join(" · ") || "Alles richtig zugeordnet."}
-        </p>
-      )}
-      {!revealed && (
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={onSubmit}
-            disabled={!allAssigned || pending}
-            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Auflösen
-          </button>
-        </div>
-      )}
+    <TaskCard {...props} status="idle">
+      <MatchTaskDnD
+        task={props.task}
+        moduleOrder={props.moduleOrder}
+        lessonOrder={props.lessonOrder}
+      />
     </TaskCard>
   );
 }

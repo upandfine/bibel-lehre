@@ -52,6 +52,10 @@ drizzle/.snapshot
 docker-data/
 postgres-data/
 
+# Lokale docker-compose-Overrides (z.B. abweichende Ports bei Port-Konflikten
+# mit anderen Projekten — siehe README oder einfach selbst anlegen).
+docker-compose.override.yml
+
 # Lizenz-Antworten (Original-PDFs der Verlage — nicht in Git)
 lizenz-anfragen/antworten/
 
