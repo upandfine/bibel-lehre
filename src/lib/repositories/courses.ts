@@ -392,6 +392,113 @@ export async function findLessonDetail(
 }
 
 // ====================================================================
+// Fortschritts-Aggregation (Course / Modul / Lektion)
+// ====================================================================
+
+/**
+ * Aufgabentypen, die KEINEN task_answer-Eintrag erzeugen können oder sollen
+ * — werden bei Fortschrittsberechnung weder im Zähler noch im Nenner
+ * mitgerechnet:
+ *
+ *   - F2_thinking: hat absichtlich kein Save (rein Reflexion)
+ *   - E1/E2_verse_memorize / E3_order_memorize: laufen außerhalb des
+ *     Lehrkurs-Systems (SRS-Verse, Bücher-Übung) — würden sonst nie als
+ *     "bearbeitet" zählen und den Fortschritt verzerren
+ */
+const NON_TRACKED_TASK_TYPES = new Set<Task["type"]>([
+  "F2_thinking",
+  "E1_verse_memorize",
+  "E2_passage_memorize",
+  "E3_order_memorize",
+]);
+
+export type LessonProgress = {
+  lessonId: string;
+  total: number;
+  answered: number;
+};
+
+export type ModuleProgress = {
+  moduleId: string;
+  total: number;
+  answered: number;
+  lessons: LessonProgress[];
+};
+
+/**
+ * Berechnet pro Modul + Lektion eines Kurses, wie viele Aufgaben es gibt
+ * und wie viele der Lerner bereits beantwortet hat. Eine Aufgabe gilt als
+ * „beantwortet", sobald ein `task_answers`-Eintrag für (userId, taskId)
+ * existiert — der Inhalt wird nicht weiter geprüft, das wäre dem Lerner
+ * gegenüber paternalistisch.
+ *
+ * Eine Query mit Joins über Course → Module → Lesson → Section → Task,
+ * outer-joined gegen task_answers. Bei aktuell ~13 Aufgaben pro Lektion
+ * und max. 30 Lektionen → unkritisch.
+ */
+export async function getCourseProgress(
+  courseSlug: string,
+  userId: string,
+): Promise<ModuleProgress[]> {
+  const course = await db.query.courses.findFirst({
+    where: eq(courses.slug, courseSlug),
+  });
+  if (!course) return [];
+
+  const rows = await db
+    .select({
+      moduleId: courseModules.id,
+      lessonId: courseLessons.id,
+      taskId: tasks.id,
+      taskType: tasks.type,
+      hasAnswer: taskAnswers.id,
+    })
+    .from(courseModules)
+    .innerJoin(courseLessons, eq(courseLessons.moduleId, courseModules.id))
+    .innerJoin(courseSections, eq(courseSections.lessonId, courseLessons.id))
+    .innerJoin(tasks, eq(tasks.sectionId, courseSections.id))
+    .leftJoin(
+      taskAnswers,
+      and(eq(taskAnswers.taskId, tasks.id), eq(taskAnswers.userId, userId)),
+    )
+    .where(eq(courseModules.courseId, course.id));
+
+  // Aggregation in der App — die SQL-Aggregation wäre möglich, aber bei der
+  // kleinen Zeilenzahl ist die JS-Aggregation klarer.
+  const moduleMap = new Map<string, ModuleProgress>();
+
+  for (const r of rows) {
+    if (NON_TRACKED_TASK_TYPES.has(r.taskType)) continue;
+
+    let mod = moduleMap.get(r.moduleId);
+    if (!mod) {
+      mod = {
+        moduleId: r.moduleId,
+        total: 0,
+        answered: 0,
+        lessons: [],
+      };
+      moduleMap.set(r.moduleId, mod);
+    }
+
+    let lesson = mod.lessons.find((l) => l.lessonId === r.lessonId);
+    if (!lesson) {
+      lesson = { lessonId: r.lessonId, total: 0, answered: 0 };
+      mod.lessons.push(lesson);
+    }
+
+    mod.total += 1;
+    lesson.total += 1;
+    if (r.hasAnswer !== null) {
+      mod.answered += 1;
+      lesson.answered += 1;
+    }
+  }
+
+  return Array.from(moduleMap.values());
+}
+
+// ====================================================================
 // Antwort speichern (Server-Action ruft diese Funktion auf)
 // ====================================================================
 

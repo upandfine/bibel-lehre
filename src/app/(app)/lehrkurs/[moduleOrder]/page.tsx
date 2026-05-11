@@ -2,9 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, GraduationCap } from "lucide-react";
-import { findModuleDetail } from "@/lib/repositories/courses";
+import {
+  findModuleDetail,
+  getCourseProgress,
+} from "@/lib/repositories/courses";
 import { routes } from "@/lib/routes";
+import { requireUser } from "@/lib/session";
 import { DEFAULT_COURSE_SLUG } from "../_lib/constants";
+import { ProgressBar } from "../_components/progress-bar";
 
 type Props = {
   params: Promise<{ moduleOrder: string }>;
@@ -23,8 +28,17 @@ export default async function ModulePage({ params }: Props) {
   const order = Number(moduleOrder);
   if (!Number.isFinite(order)) notFound();
 
-  const mod = await findModuleDetail(DEFAULT_COURSE_SLUG, order);
+  const user = await requireUser(routes.lehrkurs.module(order));
+  const [mod, progress] = await Promise.all([
+    findModuleDetail(DEFAULT_COURSE_SLUG, order),
+    getCourseProgress(DEFAULT_COURSE_SLUG, user.id),
+  ]);
   if (!mod) notFound();
+
+  const modProgress = progress.find((p) => p.moduleId === mod.id);
+  const progressByLesson = new Map(
+    (modProgress?.lessons ?? []).map((l) => [l.lessonId, l]),
+  );
 
   return (
     <div className="space-y-8">
@@ -73,21 +87,36 @@ export default async function ModulePage({ params }: Props) {
           </div>
         ) : (
           <div className="space-y-2">
-            {mod.lessons.map((l) => (
-              <Link
-                key={l.id}
-                href={routes.lehrkurs.lesson(mod.orderIndex, l.orderIndex)}
-                className="group flex items-center gap-3 rounded-xl border bg-card px-5 py-4 transition-colors hover:border-foreground/40 hover:bg-accent"
-              >
-                <GraduationCap className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium">
-                    Lektion {l.orderIndex} — {l.title}
-                  </p>
-                </div>
-                <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-              </Link>
-            ))}
+            {mod.lessons.map((l) => {
+              const lp = progressByLesson.get(l.id);
+              const total = lp?.total ?? 0;
+              const answered = lp?.answered ?? 0;
+              const pct = total > 0 ? Math.round((answered / total) * 100) : 0;
+              return (
+                <Link
+                  key={l.id}
+                  href={routes.lehrkurs.lesson(mod.orderIndex, l.orderIndex)}
+                  className="group flex items-center gap-3 rounded-xl border bg-card px-5 py-4 transition-colors hover:border-foreground/40 hover:bg-accent"
+                >
+                  <GraduationCap className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">
+                      Lektion {l.orderIndex} — {l.title}
+                    </p>
+                    {total > 0 && (
+                      <div className="mt-2">
+                        <ProgressBar
+                          answered={answered}
+                          total={total}
+                          percent={pct}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                </Link>
+              );
+            })}
           </div>
         )}
       </section>

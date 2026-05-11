@@ -7,7 +7,15 @@ import { requireUser } from "@/lib/session";
 import { routes } from "@/lib/routes";
 import { DEFAULT_COURSE_SLUG } from "../../_lib/constants";
 import { LessonText } from "../../_components/lesson-text";
+import { ProgressBar } from "../../_components/progress-bar";
 import { TaskRenderer } from "../../_components/task-renderer";
+
+const NON_TRACKED_TYPES = new Set([
+  "F2_thinking",
+  "E1_verse_memorize",
+  "E2_passage_memorize",
+  "E3_order_memorize",
+]);
 
 type Props = {
   params: Promise<{ moduleOrder: string; lessonOrder: string }>;
@@ -36,6 +44,15 @@ export default async function LessonPage({ params }: Props) {
   // Eindeutige Verse pro Bibelstelle (eine Übersetzung reicht für die Anzeige)
   const uniqueVerses = dedupeVersesByReference(lesson.memorizeVerses);
 
+  // Fortschritt: alle bearbeitbaren Tasks zählen + die mit Antwort separat.
+  // Konsistent zur Repository-Logik (siehe getCourseProgress).
+  const allTasks = lesson.sections.flatMap((s) => s.tasks);
+  const trackableTasks = allTasks.filter((t) => !NON_TRACKED_TYPES.has(t.type));
+  const answeredCount = trackableTasks.filter((t) => t.answer !== null).length;
+  const totalCount = trackableTasks.length;
+  const pct =
+    totalCount > 0 ? Math.round((answeredCount / totalCount) * 100) : 0;
+
   let taskCounter = 0;
 
   return (
@@ -48,13 +65,23 @@ export default async function LessonPage({ params }: Props) {
         {lesson.module.title}
       </Link>
 
-      <header className="space-y-2">
+      <header className="space-y-3">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">
           Modul {lesson.module.orderIndex} · Lektion {lesson.orderIndex}
         </p>
         <h1 className="font-serif text-3xl font-bold tracking-tight">
           {lesson.title}
         </h1>
+        {totalCount > 0 && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>Fortschritt:</span>
+            <ProgressBar
+              answered={answeredCount}
+              total={totalCount}
+              percent={pct}
+            />
+          </div>
+        )}
       </header>
 
       {uniqueVerses.length > 0 && (
