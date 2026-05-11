@@ -36,11 +36,10 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { saveMatchAnswer } from "../_actions";
 import { cn } from "@/lib/utils";
+import type { MatchPair } from "@/lib/lehrkurs-grading";
 import type { LessonTask } from "@/lib/repositories/courses";
 
 const POOL_ID = "__match_pool";
-
-type MatchPair = { left: string; right: string };
 
 type Status =
   | "idle"

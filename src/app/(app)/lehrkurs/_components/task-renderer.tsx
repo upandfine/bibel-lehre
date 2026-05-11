@@ -33,6 +33,16 @@ import {
 } from "../_actions";
 import { MatchTaskDnD } from "./match-task";
 import { TaskCard, type TaskCardStatus } from "./task-card";
+import {
+  isChoiceCorrect,
+  isClozeCorrect,
+  isGapCorrect,
+  isOrderingCorrect,
+  isTrueFalseCorrect,
+  type ChoiceOption,
+  type ClozeGap,
+  type TrueFalseStatement,
+} from "@/lib/lehrkurs-grading";
 import { routes } from "@/lib/routes";
 import type { LessonTask } from "@/lib/repositories/courses";
 
@@ -235,13 +245,6 @@ function TextTask({
 // ====================================================================
 // A1 — true/false mit Erklärung beim Auflösen
 // ====================================================================
-
-type TrueFalseStatement = {
-  id: string;
-  text: string;
-  answer: boolean;
-  explanation?: string;
-};
 
 function TrueFalseTask({
   task,
@@ -594,8 +597,6 @@ function ReadingTask({
 // A6 — Multiple Choice (Single oder Multi je nach config.multi)
 // ====================================================================
 
-type ChoiceOption = { id: string; text: string; correct: boolean };
-
 function ChoiceTask({
   task,
   moduleOrder,
@@ -725,15 +726,6 @@ function ChoiceTask({
   );
 }
 
-function isChoiceCorrect(
-  selected: string[],
-  options: ChoiceOption[],
-): boolean {
-  const correctIds = new Set(options.filter((o) => o.correct).map((o) => o.id));
-  if (correctIds.size !== selected.length) return false;
-  return selected.every((id) => correctIds.has(id));
-}
-
 // ====================================================================
 // A2 — Cloze (Lückentext mit Eingabefeldern)
 // ====================================================================
@@ -751,7 +743,6 @@ function isChoiceCorrect(
 // Der Text wird an {id}-Platzhaltern gesplittet, je Stück kommt eine
 // Input-Box. Tolerante Auto-Bewertung über normalizeForCloze (siehe action).
 
-type ClozeGap = { id: string; answer: string; accept?: string[] };
 
 function parseClozeText(
   text: string,
@@ -885,28 +876,6 @@ function ClozeTask({
       )}
     </TaskCard>
   );
-}
-
-function normalizeCloze(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^\p{L}\p{N}]/gu, "");
-}
-
-function isGapCorrect(userValue: string, gap: ClozeGap): boolean {
-  const u = normalizeCloze(userValue);
-  if (!u) return false;
-  const accepted = [gap.answer, ...(gap.accept ?? [])].map(normalizeCloze);
-  return accepted.includes(u);
-}
-
-function isClozeCorrect(
-  fills: Record<string, string>,
-  gaps: ClozeGap[],
-): boolean {
-  return gaps.every((g) => isGapCorrect(fills[g.id] ?? "", g));
 }
 
 // ====================================================================
@@ -1046,11 +1015,6 @@ function OrderingTask({
       )}
     </TaskCard>
   );
-}
-
-function isOrderingCorrect(user: string[], correct: string[]): boolean {
-  if (user.length !== correct.length) return false;
-  return correct.every((c, i) => user[i] === c);
 }
 
 /**

@@ -27,6 +27,17 @@ import { db } from "@/db";
 import { courses, tasks } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { validatedAction } from "@/lib/action-helpers";
+import {
+  isChoiceCorrect,
+  isClozeCorrect,
+  isOrderingCorrect,
+  isTrueFalseCorrect,
+  isMatchCorrect,
+  type ChoiceOption,
+  type ClozeGap,
+  type MatchPair,
+  type TrueFalseStatement,
+} from "@/lib/lehrkurs-grading";
 import { upsertTaskAnswer, type SelfGrade } from "@/lib/repositories/courses";
 import { getUserIdOrThrow } from "@/lib/session";
 import { routes } from "@/lib/routes";
@@ -112,120 +123,63 @@ async function resolveCourseVersionForTask(taskId: string): Promise<number> {
 }
 
 /**
- * Auto-Bewertung für A1 (true_false): Vergleich mit der `config.statements[].answer`.
- * Liefert true, wenn alle Items korrekt sind, sonst false.
+ * Lädt die `config` eines Tasks aus der DB und liefert sie zurück — oder
+ * null, wenn der Task fehlt oder keine Config hat. Die Bewertungs-Logik
+ * selbst kommt aus `@/lib/lehrkurs-grading` (pure functions, getestet).
  */
+async function getTaskConfig(taskId: string): Promise<Record<string, unknown> | null> {
+  const task = await db.query.tasks.findFirst({ where: eq(tasks.id, taskId) });
+  return (task?.config as Record<string, unknown> | undefined) ?? null;
+}
+
 async function autoCorrectTrueFalse(
   taskId: string,
   userAnswers: Record<string, boolean>,
 ): Promise<boolean | null> {
-  const task = await db.query.tasks.findFirst({
-    where: eq(tasks.id, taskId),
-  });
-  if (!task?.config) return null;
-
-  const cfg = task.config as { statements?: { id: string; answer: boolean }[] };
-  if (!cfg.statements) return null;
-
-  return cfg.statements.every((s) => userAnswers[s.id] === s.answer);
+  const cfg = await getTaskConfig(taskId);
+  const statements = cfg?.statements as TrueFalseStatement[] | undefined;
+  if (!Array.isArray(statements)) return null;
+  return isTrueFalseCorrect(userAnswers, statements);
 }
 
-/** Auto-Bewertung für A3 (match): jeder Eintrag muss exakt zum config-Pair passen. */
 async function autoCorrectMatch(
   taskId: string,
   userMatches: Record<string, string>,
 ): Promise<boolean | null> {
-  const task = await db.query.tasks.findFirst({
-    where: eq(tasks.id, taskId),
-  });
-  if (!task?.config) return null;
-
-  const cfg = task.config as { pairs?: { left: string; right: string }[] };
-  if (!cfg.pairs) return null;
-
-  return cfg.pairs.every((p) => userMatches[p.left] === p.right);
+  const cfg = await getTaskConfig(taskId);
+  const pairs = cfg?.pairs as MatchPair[] | undefined;
+  if (!Array.isArray(pairs)) return null;
+  return isMatchCorrect(userMatches, pairs);
 }
 
-/**
- * Tolerante String-Normalisierung für Cloze-Eingaben — gleiche Logik wie
- * in der Bücher-Übung (utils.normalize): lowercase, ohne Diakritika, ohne
- * Punktuation/Whitespace. Verzeiht „Pentateuch.", „pentateuch ", etc.
- */
-function normalizeForCloze(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^\p{L}\p{N}]/gu, "");
-}
-
-/**
- * Auto-Bewertung A2 (cloze): jede Lücke matched gegen ihre `accept[]` (oder
- * `answer`) im config — tolerant gegen Schreibweisen-Varianten.
- *
- * Config-Form: { kind: "cloze", gaps: { id, answer, accept?: string[] }[] }
- */
 async function autoCorrectCloze(
   taskId: string,
   userFills: Record<string, string>,
 ): Promise<boolean | null> {
-  const task = await db.query.tasks.findFirst({ where: eq(tasks.id, taskId) });
-  if (!task?.config) return null;
-
-  const cfg = task.config as {
-    gaps?: { id: string; answer: string; accept?: string[] }[];
-  };
-  if (!cfg.gaps) return null;
-
-  return cfg.gaps.every((g) => {
-    const userValue = normalizeForCloze(userFills[g.id] ?? "");
-    if (!userValue) return false;
-    const accepted = [g.answer, ...(g.accept ?? [])].map(normalizeForCloze);
-    return accepted.includes(userValue);
-  });
+  const cfg = await getTaskConfig(taskId);
+  const gaps = cfg?.gaps as ClozeGap[] | undefined;
+  if (!Array.isArray(gaps)) return null;
+  return isClozeCorrect(userFills, gaps);
 }
 
-/** Auto-Bewertung A5 (ordering): User-Reihenfolge muss exakt config.items entsprechen. */
 async function autoCorrectOrdering(
   taskId: string,
   userOrder: string[],
 ): Promise<boolean | null> {
-  const task = await db.query.tasks.findFirst({ where: eq(tasks.id, taskId) });
-  if (!task?.config) return null;
-
-  const cfg = task.config as { items?: string[] };
-  if (!cfg.items) return null;
-
-  if (userOrder.length !== cfg.items.length) return false;
-  return cfg.items.every((item, i) => userOrder[i] === item);
+  const cfg = await getTaskConfig(taskId);
+  const items = cfg?.items as string[] | undefined;
+  if (!Array.isArray(items)) return null;
+  return isOrderingCorrect(userOrder, items);
 }
 
-/**
- * Auto-Bewertung A6 (choice): Single oder Multiple. Bei Multi muss die Menge
- * der selected exakt der Menge der correct-Optionen entsprechen.
- *
- * Config-Form: { kind, options: { id, text, correct }[], multi?: boolean }
- */
 async function autoCorrectChoice(
   taskId: string,
   userSelected: string[],
 ): Promise<boolean | null> {
-  const task = await db.query.tasks.findFirst({ where: eq(tasks.id, taskId) });
-  if (!task?.config) return null;
-
-  const cfg = task.config as {
-    options?: { id: string; correct: boolean }[];
-  };
-  if (!cfg.options) return null;
-
-  const correctIds = new Set(
-    cfg.options.filter((o) => o.correct).map((o) => o.id),
-  );
-  const selectedIds = new Set(userSelected);
-
-  if (correctIds.size !== selectedIds.size) return false;
-  for (const id of correctIds) if (!selectedIds.has(id)) return false;
-  return true;
+  const cfg = await getTaskConfig(taskId);
+  const options = cfg?.options as ChoiceOption[] | undefined;
+  if (!Array.isArray(options)) return null;
+  return isChoiceCorrect(userSelected, options);
 }
 
 export const saveTextAnswer = validatedAction(
