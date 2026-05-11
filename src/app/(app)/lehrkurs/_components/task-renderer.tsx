@@ -26,7 +26,10 @@ import {
   XCircle,
 } from "lucide-react";
 import {
+  saveChoiceAnswer,
+  saveClozeAnswer,
   saveMatchAnswer,
+  saveOrderingAnswer,
   saveTextAnswer,
   saveTrueFalseAnswer,
   toggleReadingDone,
@@ -48,8 +51,14 @@ export function TaskRenderer(props: TaskRendererProps) {
     // --- Auto-bewertbar ---
     case "A1_true_false":
       return <TrueFalseTask {...props} />;
+    case "A2_cloze":
+      return <ClozeTask {...props} />;
     case "A3_match":
       return <MatchTask {...props} />;
+    case "A5_ordering":
+      return <OrderingTask {...props} />;
+    case "A6_choice":
+      return <ChoiceTask {...props} />;
 
     // --- Selbstbewertete Texteingabe (B/C-Typen unterscheiden sich nur in
     //     Textarea-Höhe und Hint im Placeholder) ---
@@ -118,8 +127,7 @@ export function TaskRenderer(props: TaskRendererProps) {
     case "F2_thinking":
       return <ThinkingTask {...props} />;
 
-    // Cloze A2 + Tabelle A4 + Ordering A5 + Choice A6 — kommen im nächsten
-    // Commit als eigene Renderer mit Auto-Bewertung.
+    // A4 Tabelle kommt später — selten gebraucht, eigene komplexere UI nötig.
     default:
       return (
         <TaskCard {...props} status="idle">
@@ -765,6 +773,501 @@ function ReadingTask({
       </button>
     </TaskCard>
   );
+}
+
+// ====================================================================
+// A6 — Multiple Choice (Single oder Multi je nach config.multi)
+// ====================================================================
+
+type ChoiceOption = { id: string; text: string; correct: boolean };
+
+function ChoiceTask({
+  task,
+  moduleOrder,
+  lessonOrder,
+  number,
+}: TaskRendererProps) {
+  const cfg = (task.config as
+    | { options?: ChoiceOption[]; multi?: boolean }
+    | null) ?? {};
+  const options = cfg.options ?? [];
+  const multi = cfg.multi === true;
+
+  const stored =
+    (task.answer?.answer as { selected?: string[] } | undefined)?.selected ?? [];
+
+  const [selected, setSelected] = useState<Set<string>>(new Set(stored));
+  const [revealed, setRevealed] = useState(stored.length > 0);
+  const [status, setStatus] = useState<Status>(
+    revealed
+      ? isChoiceCorrect(stored, options)
+        ? "auto_correct"
+        : "auto_incorrect"
+      : "idle",
+  );
+  const [pending, startTransition] = useTransition();
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (multi) {
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+      } else {
+        next.clear();
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const onSubmit = () => {
+    if (selected.size === 0) return;
+    setStatus("saving");
+    startTransition(async () => {
+      try {
+        const res = await saveChoiceAnswer({
+          taskId: task.id,
+          moduleOrder,
+          lessonOrder,
+          selected: Array.from(selected),
+        });
+        setStatus(res.isAutoCorrect ? "auto_correct" : "auto_incorrect");
+        setRevealed(true);
+      } catch {
+        setStatus("error");
+      }
+    });
+  };
+
+  return (
+    <TaskCard
+      task={task}
+      moduleOrder={moduleOrder}
+      lessonOrder={lessonOrder}
+      number={number}
+      status={status}
+    >
+      <p className="text-xs text-muted-foreground">
+        {multi
+          ? "Mehrere Antworten können richtig sein."
+          : "Genau eine Antwort ist richtig."}
+      </p>
+      <div className="space-y-1.5">
+        {options.map((o) => {
+          const isSel = selected.has(o.id);
+          const correct = revealed && o.correct;
+          const wrongSel = revealed && isSel && !o.correct;
+          return (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => !revealed && toggle(o.id)}
+              disabled={revealed}
+              className={
+                "flex w-full items-start gap-3 rounded-md border px-3 py-2 text-left text-sm transition-colors " +
+                (correct
+                  ? "border-emerald-300 bg-emerald-50 dark:bg-emerald-950/20"
+                  : wrongSel
+                    ? "border-amber-300 bg-amber-50 dark:bg-amber-950/20"
+                    : isSel
+                      ? "border-primary bg-primary/5"
+                      : "bg-background hover:bg-muted") +
+                (revealed ? " cursor-default" : " cursor-pointer")
+              }
+              aria-pressed={isSel}
+            >
+              <span
+                className={
+                  "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border-2 " +
+                  (multi ? "rounded-sm" : "rounded-full") +
+                  " " +
+                  (isSel
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-muted-foreground/40")
+                }
+              >
+                {isSel && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
+              </span>
+              <span className="flex-1">{o.text}</span>
+            </button>
+          );
+        })}
+      </div>
+      {!revealed && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={selected.size === 0 || pending}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Auflösen
+          </button>
+        </div>
+      )}
+    </TaskCard>
+  );
+}
+
+function isChoiceCorrect(
+  selected: string[],
+  options: ChoiceOption[],
+): boolean {
+  const correctIds = new Set(options.filter((o) => o.correct).map((o) => o.id));
+  if (correctIds.size !== selected.length) return false;
+  return selected.every((id) => correctIds.has(id));
+}
+
+// ====================================================================
+// A2 — Cloze (Lückentext mit Eingabefeldern)
+// ====================================================================
+//
+// Config-Form:
+//   {
+//     kind: "cloze",
+//     text: "Die Bibel wurde auf {hebr} und {grie} geschrieben.",
+//     gaps: [
+//       { id: "hebr", answer: "Hebräisch", accept: ["hebraisch"] },
+//       { id: "grie", answer: "Griechisch" }
+//     ]
+//   }
+//
+// Der Text wird an {id}-Platzhaltern gesplittet, je Stück kommt eine
+// Input-Box. Tolerante Auto-Bewertung über normalizeForCloze (siehe action).
+
+type ClozeGap = { id: string; answer: string; accept?: string[] };
+
+function parseClozeText(
+  text: string,
+): { kind: "text"; value: string }[] | { kind: "gap"; id: string }[] {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const parts: any[] = [];
+  const regex = /\{([a-zA-Z0-9_-]+)\}/g;
+  let lastIdx = 0;
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(text)) !== null) {
+    if (m.index > lastIdx) {
+      parts.push({ kind: "text", value: text.slice(lastIdx, m.index) });
+    }
+    parts.push({ kind: "gap", id: m[1] });
+    lastIdx = m.index + m[0].length;
+  }
+  if (lastIdx < text.length) {
+    parts.push({ kind: "text", value: text.slice(lastIdx) });
+  }
+  return parts;
+}
+
+function ClozeTask({
+  task,
+  moduleOrder,
+  lessonOrder,
+  number,
+}: TaskRendererProps) {
+  const cfg = (task.config as
+    | { text?: string; gaps?: ClozeGap[] }
+    | null) ?? {};
+  const text = cfg.text ?? "";
+  const gaps = cfg.gaps ?? [];
+  const parts = parseClozeText(text);
+
+  const initialFills =
+    (task.answer?.answer as { fills?: Record<string, string> } | undefined)
+      ?.fills ?? {};
+
+  const [fills, setFills] = useState<Record<string, string>>(initialFills);
+  const [revealed, setRevealed] = useState(Object.keys(initialFills).length > 0);
+  const [status, setStatus] = useState<Status>(
+    revealed
+      ? isClozeCorrect(initialFills, gaps)
+        ? "auto_correct"
+        : "auto_incorrect"
+      : "idle",
+  );
+  const [pending, startTransition] = useTransition();
+
+  const allFilled = gaps.every((g) => (fills[g.id] ?? "").trim().length > 0);
+
+  const onSubmit = () => {
+    if (!allFilled) return;
+    setStatus("saving");
+    startTransition(async () => {
+      try {
+        const res = await saveClozeAnswer({
+          taskId: task.id,
+          moduleOrder,
+          lessonOrder,
+          fills,
+        });
+        setStatus(res.isAutoCorrect ? "auto_correct" : "auto_incorrect");
+        setRevealed(true);
+      } catch {
+        setStatus("error");
+      }
+    });
+  };
+
+  return (
+    <TaskCard
+      task={task}
+      moduleOrder={moduleOrder}
+      lessonOrder={lessonOrder}
+      number={number}
+      status={status}
+    >
+      <p className="flex flex-wrap items-baseline gap-x-1 gap-y-2 text-sm leading-relaxed">
+        {parts.map((p, idx) => {
+          if (p.kind === "text") {
+            return <span key={idx}>{p.value}</span>;
+          }
+          const gap = gaps.find((g) => g.id === p.id);
+          const userValue = fills[p.id] ?? "";
+          const correct =
+            revealed &&
+            gap &&
+            isGapCorrect(userValue, gap);
+          const wrong = revealed && !correct;
+          return (
+            <span key={idx} className="inline-flex flex-col">
+              <input
+                type="text"
+                value={userValue}
+                onChange={(e) =>
+                  setFills({ ...fills, [p.id]: e.target.value })
+                }
+                disabled={revealed}
+                className={
+                  "min-w-[6rem] rounded border-b-2 bg-transparent px-1 py-0.5 text-center font-medium focus:outline-none disabled:cursor-not-allowed " +
+                  (correct
+                    ? "border-emerald-500 text-emerald-700 dark:text-emerald-400"
+                    : wrong
+                      ? "border-amber-500 text-amber-700 dark:text-amber-400"
+                      : "border-muted-foreground/40 focus:border-primary")
+                }
+                aria-label={`Lücke ${p.id}`}
+              />
+              {wrong && gap && (
+                <span className="mt-0.5 text-xs text-muted-foreground">
+                  → {gap.answer}
+                </span>
+              )}
+            </span>
+          );
+        })}
+      </p>
+      {!revealed && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={!allFilled || pending}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Auflösen
+          </button>
+        </div>
+      )}
+    </TaskCard>
+  );
+}
+
+function normalizeCloze(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+function isGapCorrect(userValue: string, gap: ClozeGap): boolean {
+  const u = normalizeCloze(userValue);
+  if (!u) return false;
+  const accepted = [gap.answer, ...(gap.accept ?? [])].map(normalizeCloze);
+  return accepted.includes(u);
+}
+
+function isClozeCorrect(
+  fills: Record<string, string>,
+  gaps: ClozeGap[],
+): boolean {
+  return gaps.every((g) => isGapCorrect(fills[g.id] ?? "", g));
+}
+
+// ====================================================================
+// A5 — Ordering (Items in die richtige Reihenfolge bringen)
+//
+// MVP: Up/Down-Buttons statt Drag&Drop. Reicht für 3-6 Items, deutlich
+// einfacher als komplette dnd-kit-Integration und auf Mobile robuster.
+// ====================================================================
+
+function OrderingTask({
+  task,
+  moduleOrder,
+  lessonOrder,
+  number,
+}: TaskRendererProps) {
+  const cfg = (task.config as { items?: string[] } | null) ?? {};
+  const correctOrder = cfg.items ?? [];
+
+  // Stored Order oder gemischte Initial-Reihenfolge
+  const storedOrder =
+    (task.answer?.answer as { order?: string[] } | undefined)?.order;
+
+  const [order, setOrder] = useState<string[]>(() => {
+    if (storedOrder && storedOrder.length === correctOrder.length) {
+      return storedOrder;
+    }
+    return shuffleStable(correctOrder, task.id);
+  });
+  const [revealed, setRevealed] = useState(!!storedOrder);
+  const [status, setStatus] = useState<Status>(
+    revealed
+      ? isOrderingCorrect(storedOrder ?? [], correctOrder)
+        ? "auto_correct"
+        : "auto_incorrect"
+      : "idle",
+  );
+  const [pending, startTransition] = useTransition();
+
+  const move = (idx: number, dir: -1 | 1) => {
+    const j = idx + dir;
+    if (j < 0 || j >= order.length) return;
+    const next = [...order];
+    [next[idx], next[j]] = [next[j], next[idx]];
+    setOrder(next);
+  };
+
+  const onSubmit = () => {
+    setStatus("saving");
+    startTransition(async () => {
+      try {
+        const res = await saveOrderingAnswer({
+          taskId: task.id,
+          moduleOrder,
+          lessonOrder,
+          order,
+        });
+        setStatus(res.isAutoCorrect ? "auto_correct" : "auto_incorrect");
+        setRevealed(true);
+      } catch {
+        setStatus("error");
+      }
+    });
+  };
+
+  return (
+    <TaskCard
+      task={task}
+      moduleOrder={moduleOrder}
+      lessonOrder={lessonOrder}
+      number={number}
+      status={status}
+    >
+      <p className="text-xs text-muted-foreground">
+        Bring die Items mit den Pfeilen in die richtige Reihenfolge.
+      </p>
+      <ol className="space-y-1.5">
+        {order.map((item, idx) => {
+          const correctPosition = correctOrder[idx] === item;
+          return (
+            <li
+              key={item}
+              className={
+                "flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm " +
+                (revealed && correctPosition
+                  ? "border-emerald-300 bg-emerald-50 dark:bg-emerald-950/20"
+                  : revealed
+                    ? "border-amber-300 bg-amber-50 dark:bg-amber-950/20"
+                    : "")
+              }
+            >
+              <span className="w-5 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                {idx + 1}.
+              </span>
+              <span className="flex-1">{item}</span>
+              {!revealed && (
+                <span className="flex shrink-0 gap-1">
+                  <button
+                    type="button"
+                    onClick={() => move(idx, -1)}
+                    disabled={idx === 0}
+                    className="rounded-md border bg-background px-2 py-0.5 text-xs hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Nach oben"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => move(idx, 1)}
+                    disabled={idx === order.length - 1}
+                    className="rounded-md border bg-background px-2 py-0.5 text-xs hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Nach unten"
+                  >
+                    ↓
+                  </button>
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+      {revealed && (
+        <p className="text-xs text-muted-foreground">
+          Richtige Reihenfolge: {correctOrder.join(" → ")}
+        </p>
+      )}
+      {!revealed && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={pending}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Auflösen
+          </button>
+        </div>
+      )}
+    </TaskCard>
+  );
+}
+
+function isOrderingCorrect(user: string[], correct: string[]): boolean {
+  if (user.length !== correct.length) return false;
+  return correct.every((c, i) => user[i] === c);
+}
+
+/**
+ * Deterministischer Pseudo-Shuffle anhand der Task-ID — beim Reload sieht
+ * der Lerner die gleiche Anfangs-Reihenfolge (statt jedes Mal eine neue),
+ * was viel weniger frustrierend ist.
+ */
+function shuffleStable(arr: string[], seed: string): string[] {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = (h << 5) - h + seed.charCodeAt(i);
+    h |= 0;
+  }
+  const a = [...arr];
+  // Fisher-Yates mit deterministischem PRNG (Mulberry32)
+  let s = h >>> 0 || 1;
+  const next = () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(next() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  // Falls zufällig identisch zur Eingabe: 1 swap erzwingen.
+  if (a.length > 1 && a.every((x, i) => x === arr[i])) {
+    [a[0], a[1]] = [a[1], a[0]];
+  }
+  return a;
 }
 
 // ====================================================================
