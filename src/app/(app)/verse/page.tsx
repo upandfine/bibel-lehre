@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Eye, Pencil } from "lucide-react";
+import { ArrowRight, Eye, ListChecks, Pencil, Settings } from "lucide-react";
+import { getOptionalUser } from "@/lib/session";
 import { getVerseStats } from "./_actions";
 
 export const metadata: Metadata = {
@@ -8,7 +9,11 @@ export const metadata: Metadata = {
 };
 
 export default async function VersePage() {
-  const stats = await getVerseStats();
+  const [stats, user] = await Promise.all([
+    getVerseStats(),
+    getOptionalUser(),
+  ]);
+  const isAdmin = user?.role === "admin";
 
   return (
     <div className="space-y-6">
@@ -78,9 +83,8 @@ export default async function VersePage() {
             <>
               <p className="text-foreground">Noch keine Verse angelegt.</p>
               <p className="mt-2">
-                Im MVP-Stand sind die Verse aus dem Seed automatisch verfügbar
-                (sichtbar als „public" im Katalog). Eigene Verse anlegen kannst
-                du in der nächsten Phase.
+                Die mitgelieferten Verse sind automatisch verfügbar. Eigene
+                Verse legst du unter „Verse verwalten“ an.
               </p>
             </>
           ) : (
@@ -96,6 +100,45 @@ export default async function VersePage() {
           )}
         </div>
       )}
+
+      <section className="grid gap-3 sm:grid-cols-2">
+        <Link
+          href="/verse/auswahl"
+          className="group flex flex-col gap-2 rounded-xl border bg-card p-5 transition-colors hover:border-foreground/40 hover:bg-accent"
+        >
+          <div className="flex items-center gap-2">
+            <ListChecks className="h-4 w-4" />
+            <span className="font-medium">Eigene Auswahl üben</span>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Bestimmte Verse gezielt durchgehen — ohne Einfluss auf die
+            zeitversetzte Wiederholung.
+          </p>
+          <span className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-foreground">
+            Auswählen
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </span>
+        </Link>
+
+        <Link
+          href="/verse/verwalten"
+          className="group flex flex-col gap-2 rounded-xl border bg-card p-5 transition-colors hover:border-foreground/40 hover:bg-accent"
+        >
+          <div className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            <span className="font-medium">Verse verwalten</span>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {isAdmin
+              ? "Eigene Lernverse anlegen, bearbeiten und ein Lied (MP3/WAV) zum Vers hinterlegen."
+              : "Eigene private Lernverse anlegen und bearbeiten."}
+          </p>
+          <span className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-foreground">
+            Öffnen
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </span>
+        </Link>
+      </section>
     </div>
   );
 }
