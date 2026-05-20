@@ -17,6 +17,7 @@ import {
   SessionDone,
   gradeOrder,
 } from "../../_components/session-shared";
+import { VerseAudio } from "../../_components/verse-audio";
 
 type Phase = "filling" | "checked";
 
@@ -178,6 +179,11 @@ export function ClozeSession({ verses }: { verses: DueVerse[] }) {
             </p>
             {current.attribution && (
               <p className="mt-2 text-xs">{current.attribution}</p>
+            )}
+            {current.hasAudio && (
+              <div className="mt-3">
+                <VerseAudio verseId={current.id} />
+              </div>
             )}
           </div>
         )}

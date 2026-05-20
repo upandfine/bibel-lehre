@@ -7,14 +7,16 @@
  */
 
 import "server-only";
-import { and, asc, eq, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   bibleBooks,
   bibleTranslations,
   userProgress,
+  verseAudio,
   verseLearnItems,
 } from "@/db/schema";
+import type { NewVerseLearnItem } from "@/db/schema";
 import {
   findSrsProgress,
   upsertSrsProgress,
@@ -57,6 +59,7 @@ export type DueVerseRow = {
   dueAt: Date | null;
   lastGrade: string | null;
   totalReviews: number | null;
+  hasAudio: boolean;
 };
 
 /**
@@ -84,6 +87,7 @@ export async function findDueVerses(
       dueAt: userProgress.dueAt,
       lastGrade: userProgress.lastGrade,
       totalReviews: userProgress.totalReviews,
+      hasAudio: sql<boolean>`${verseAudio.verseId} is not null`,
     })
     .from(verseLearnItems)
     .innerJoin(bibleBooks, eq(verseLearnItems.bookId, bibleBooks.id))
@@ -91,6 +95,7 @@ export async function findDueVerses(
       bibleTranslations,
       eq(verseLearnItems.translationId, bibleTranslations.id),
     )
+    .leftJoin(verseAudio, eq(verseAudio.verseId, verseLearnItems.id))
     .leftJoin(userProgress, progressForUser(userId))
     .where(
       and(
@@ -157,4 +162,218 @@ export function upsertProgress(input: VerseUpsertInput): Promise<void> {
     sourceType: VERSE_SOURCE_TYPE,
     sourceId: verseId,
   });
+}
+
+// ====================================================================
+// Vers-Auswahl für freie Übungs-Sessions (ohne SRS-Einfluss)
+// ====================================================================
+
+export type SelectableVerseRow = {
+  id: string;
+  bookAbbr: string;
+  bookNameDe: string;
+  chapter: number;
+  verseFrom: number;
+  verseTo: number;
+  text: string;
+  translationFullName: string;
+  attribution: string | null;
+  hasAudio: boolean;
+};
+
+/**
+ * Alle für den User sichtbaren Verse (eigen oder public) — Volltext inkl.
+ * Audio-Flag. Für die manuelle Auswahl einer Übungs-Session; KEIN
+ * Fälligkeits-Filter, da der User bewusst selbst wählt.
+ */
+export async function findVisibleVerses(
+  userId: string,
+): Promise<SelectableVerseRow[]> {
+  return db
+    .select({
+      id: verseLearnItems.id,
+      bookAbbr: bibleBooks.abbr,
+      bookNameDe: bibleBooks.nameDe,
+      chapter: verseLearnItems.chapter,
+      verseFrom: verseLearnItems.verseFrom,
+      verseTo: verseLearnItems.verseTo,
+      text: verseLearnItems.text,
+      translationFullName: bibleTranslations.fullName,
+      attribution: bibleTranslations.attribution,
+      hasAudio: sql<boolean>`${verseAudio.verseId} is not null`,
+    })
+    .from(verseLearnItems)
+    .innerJoin(bibleBooks, eq(verseLearnItems.bookId, bibleBooks.id))
+    .innerJoin(
+      bibleTranslations,
+      eq(verseLearnItems.translationId, bibleTranslations.id),
+    )
+    .leftJoin(verseAudio, eq(verseAudio.verseId, verseLearnItems.id))
+    .where(visibleToUser(userId))
+    .orderBy(
+      asc(bibleBooks.orderIndex),
+      asc(verseLearnItems.chapter),
+      asc(verseLearnItems.verseFrom),
+    );
+}
+
+// ====================================================================
+// Vers-Verwaltung (Admin) — CRUD
+// ====================================================================
+
+export type ManagedVerseRow = SelectableVerseRow & {
+  visibility: "private" | "group" | "public";
+  translationId: string;
+  bookId: number;
+  attributionOverride: string | null;
+};
+
+/** Alle Verse, die dem Nutzer gehören (Admin sieht zusätzlich die Seed-Verse). */
+export async function findManagedVerses(
+  ownerId: string,
+): Promise<ManagedVerseRow[]> {
+  return db
+    .select({
+      id: verseLearnItems.id,
+      bookId: verseLearnItems.bookId,
+      bookAbbr: bibleBooks.abbr,
+      bookNameDe: bibleBooks.nameDe,
+      chapter: verseLearnItems.chapter,
+      verseFrom: verseLearnItems.verseFrom,
+      verseTo: verseLearnItems.verseTo,
+      text: verseLearnItems.text,
+      translationId: verseLearnItems.translationId,
+      translationFullName: bibleTranslations.fullName,
+      attribution: bibleTranslations.attribution,
+      visibility: verseLearnItems.visibility,
+      attributionOverride: verseLearnItems.attributionOverride,
+      hasAudio: sql<boolean>`${verseAudio.verseId} is not null`,
+    })
+    .from(verseLearnItems)
+    .innerJoin(bibleBooks, eq(verseLearnItems.bookId, bibleBooks.id))
+    .innerJoin(
+      bibleTranslations,
+      eq(verseLearnItems.translationId, bibleTranslations.id),
+    )
+    .leftJoin(verseAudio, eq(verseAudio.verseId, verseLearnItems.id))
+    .where(eq(verseLearnItems.ownerId, ownerId))
+    .orderBy(desc(verseLearnItems.updatedAt));
+}
+
+export type VerseWriteInput = Pick<
+  NewVerseLearnItem,
+  | "bookId"
+  | "chapter"
+  | "verseFrom"
+  | "verseTo"
+  | "translationId"
+  | "text"
+  | "visibility"
+> & { attributionOverride: string | null };
+
+export async function createVerseItem(
+  ownerId: string,
+  input: VerseWriteInput,
+): Promise<string> {
+  const [row] = await db
+    .insert(verseLearnItems)
+    .values({ ownerId, ...input })
+    .returning({ id: verseLearnItems.id });
+  return row.id;
+}
+
+/** Aktualisiert einen Vers — nur wenn er dem Owner gehört. */
+export async function updateVerseItem(
+  ownerId: string,
+  verseId: string,
+  input: VerseWriteInput,
+): Promise<boolean> {
+  const updated = await db
+    .update(verseLearnItems)
+    .set({ ...input, updatedAt: new Date() })
+    .where(
+      and(
+        eq(verseLearnItems.id, verseId),
+        eq(verseLearnItems.ownerId, ownerId),
+      ),
+    )
+    .returning({ id: verseLearnItems.id });
+  return updated.length > 0;
+}
+
+/** Löscht einen Vers (Audio + SRS-Progress über DB-Cascade/Polymorph). */
+export async function deleteVerseItem(
+  ownerId: string,
+  verseId: string,
+): Promise<boolean> {
+  const deleted = await db
+    .delete(verseLearnItems)
+    .where(
+      and(
+        eq(verseLearnItems.id, verseId),
+        eq(verseLearnItems.ownerId, ownerId),
+      ),
+    )
+    .returning({ id: verseLearnItems.id });
+  return deleted.length > 0;
+}
+
+// ====================================================================
+// Audio (Lied pro Vers) — als bytea in Postgres
+// ====================================================================
+
+/** Owner + Sichtbarkeit eines Verses — für Zugriffsprüfung im Audio-Endpoint. */
+export async function findVerseAccess(
+  verseId: string,
+): Promise<{ ownerId: string; visibility: string } | null> {
+  const [row] = await db
+    .select({
+      ownerId: verseLearnItems.ownerId,
+      visibility: verseLearnItems.visibility,
+    })
+    .from(verseLearnItems)
+    .where(eq(verseLearnItems.id, verseId))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function getVerseAudio(
+  verseId: string,
+): Promise<{ data: Buffer; mimeType: string; sizeBytes: number } | null> {
+  const [row] = await db
+    .select({
+      data: verseAudio.data,
+      mimeType: verseAudio.mimeType,
+      sizeBytes: verseAudio.sizeBytes,
+    })
+    .from(verseAudio)
+    .where(eq(verseAudio.verseId, verseId))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function setVerseAudio(input: {
+  verseId: string;
+  data: Buffer;
+  mimeType: string;
+  filename: string | null;
+  sizeBytes: number;
+}): Promise<void> {
+  await db
+    .insert(verseAudio)
+    .values(input)
+    .onConflictDoUpdate({
+      target: verseAudio.verseId,
+      set: {
+        data: input.data,
+        mimeType: input.mimeType,
+        filename: input.filename,
+        sizeBytes: input.sizeBytes,
+        updatedAt: new Date(),
+      },
+    });
+}
+
+export async function deleteVerseAudio(verseId: string): Promise<void> {
+  await db.delete(verseAudio).where(eq(verseAudio.verseId, verseId));
 }

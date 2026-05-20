@@ -24,7 +24,9 @@ import { z } from "zod";
  *   - Handler-Errors fließen wie sonst durch
  */
 export function validatedAction<TInput, TOutput>(
-  schema: z.ZodSchema<TInput>,
+  // Drittes Generic auf `unknown`, damit auch Schemas mit .default()/.transform()
+  // (abweichender Roh-Input ↔ geparstes Ergebnis) zulässig sind.
+  schema: z.ZodType<TInput, z.ZodTypeDef, unknown>,
   handler: (input: TInput) => Promise<TOutput>,
 ) {
   return async (rawInput: unknown): Promise<TOutput> => {

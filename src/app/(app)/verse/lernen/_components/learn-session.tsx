@@ -11,6 +11,7 @@ import {
   SessionDone,
   gradeOrder,
 } from "../../_components/session-shared";
+import { VerseAudio } from "../../_components/verse-audio";
 
 type Phase = "front" | "back";
 
@@ -92,6 +93,7 @@ export function LearnSession({ verses }: { verses: DueVerse[] }) {
                 {current.attribution}
               </p>
             )}
+            {current.hasAudio && <VerseAudio verseId={current.id} />}
           </div>
         )}
       </article>

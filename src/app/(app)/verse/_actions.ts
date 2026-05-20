@@ -34,6 +34,7 @@ export type DueVerse = {
   repetitions: number | null;
   lastGrade: string | null;
   totalReviews: number;
+  hasAudio: boolean;
 };
 
 function formatReference(
@@ -62,6 +63,7 @@ function rowToDueVerse(r: DueVerseRow): DueVerse {
     repetitions: r.repetitions,
     lastGrade: r.lastGrade,
     totalReviews: r.totalReviews ?? 0,
+    hasAudio: r.hasAudio,
   };
 }
 

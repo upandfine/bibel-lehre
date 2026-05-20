@@ -64,6 +64,58 @@ export const translationsSeed: SeedTranslation[] = [
     attribution: "Lutherbibel 1912 — Public Domain.",
     licenseStatus: "public_domain",
   },
+  // Aktuelle Übersetzungen — nur Metadaten. Texte erst eintippen, wenn die
+  // jeweilige Lizenz geklärt ist (analog SCH2000/ELB-rev: licensed_pending).
+  {
+    id: "ELB-CSV",
+    fullName: "Elberfelder Übersetzung (Edition CSV Hückeswagen, 2006)",
+    publisher: "Christliche Schriftenverbreitung, Hückeswagen",
+    year: 2006,
+    isPublicDomain: false,
+    attribution:
+      "Elberfelder Übersetzung, Edition CSV Hückeswagen © Christliche Schriftenverbreitung, Hückeswagen. Verwendet mit freundlicher Genehmigung.",
+    licenseStatus: "licensed_pending",
+  },
+  {
+    id: "NGUE",
+    fullName: "Neue Genfer Übersetzung",
+    publisher: "Genfer Bibelgesellschaft, Romanel-sur-Lausanne",
+    year: 2011,
+    isPublicDomain: false,
+    attribution:
+      "Neue Genfer Übersetzung © Genfer Bibelgesellschaft. Verwendet mit freundlicher Genehmigung.",
+    licenseStatus: "licensed_pending",
+  },
+  {
+    id: "LU2017",
+    fullName: "Lutherbibel 2017",
+    publisher: "Deutsche Bibelgesellschaft, Stuttgart",
+    year: 2017,
+    isPublicDomain: false,
+    attribution:
+      "Lutherbibel, revidiert 2017 © 2016 Deutsche Bibelgesellschaft, Stuttgart. Verwendet mit freundlicher Genehmigung.",
+    licenseStatus: "licensed_pending",
+  },
+  {
+    id: "NLB",
+    fullName: "Neues Leben. Die Bibel",
+    publisher: "SCM R. Brockhaus, Witten",
+    year: 2017,
+    isPublicDomain: false,
+    attribution:
+      "Neues Leben. Die Bibel © SCM R. Brockhaus im SCM-Verlag, Witten. Verwendet mit freundlicher Genehmigung.",
+    licenseStatus: "licensed_pending",
+  },
+  {
+    id: "HFA",
+    fullName: "Hoffnung für alle",
+    publisher: "Fontis-Verlag, Basel",
+    year: 2015,
+    isPublicDomain: false,
+    attribution:
+      "Hoffnung für alle® © 2015 Fontis-Verlag, Basel. Verwendet mit freundlicher Genehmigung.",
+    licenseStatus: "licensed_pending",
+  },
 ];
 
 export type SeedVerse = {

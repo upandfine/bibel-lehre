@@ -23,8 +23,22 @@ import {
   primaryKey,
   index,
   uniqueIndex,
+  customType,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
+
+/**
+ * Postgres `bytea` — Drizzle hat keinen nativen Binär-Typ. postgres.js
+ * mappt bytea ↔ Node Buffer, daher reicht dieser schlanke customType.
+ * Genutzt für hochgeladene Lied-Audios (siehe verseAudio); bewusst klein
+ * gehalten + striktes Größenlimit im Upload-Handler, da das DB-Wachstum
+ * sonst unkontrolliert wäre (Solo-Stack, kein Object-Storage).
+ */
+const bytea = customType<{ data: Buffer; default: false }>({
+  dataType() {
+    return "bytea";
+  },
+});
 
 // ====================================================================
 // Enums
@@ -255,6 +269,24 @@ export const verseLearnItems = pgTable(
     ownerIdx: index("verse_learn_items_owner_idx").on(t.ownerId),
   }),
 );
+
+/**
+ * Optionales Lied (MP3/WAV) zu einem Lernvers — als Gedächtnisstütze.
+ * 1:1 zu verse_learn_items, bewusst eigene Tabelle: das Blob soll NIE
+ * versehentlich in eine Vers-Liste/Lern-Query geladen werden, sondern
+ * nur über den dedizierten Audio-Streaming-Endpoint.
+ */
+export const verseAudio = pgTable("verse_audio", {
+  verseId: uuid("verse_id")
+    .primaryKey()
+    .references(() => verseLearnItems.id, { onDelete: "cascade" }),
+  data: bytea("data").notNull(),
+  mimeType: varchar("mime_type", { length: 50 }).notNull(),
+  filename: varchar("filename", { length: 255 }),
+  sizeBytes: integer("size_bytes").notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+});
 
 // ====================================================================
 // Lehrkurse — strukturierte Kurse mit Modulen, Lektionen, Sektionen, Aufgaben
@@ -669,18 +701,32 @@ export const taskAnswersRelations = relations(taskAnswers, ({ one }) => ({
   user: one(users, { fields: [taskAnswers.userId], references: [users.id] }),
 }));
 
-export const verseLearnItemsRelations = relations(verseLearnItems, ({ one }) => ({
-  owner: one(users, {
-    fields: [verseLearnItems.ownerId],
-    references: [users.id],
+export const verseLearnItemsRelations = relations(
+  verseLearnItems,
+  ({ one }) => ({
+    owner: one(users, {
+      fields: [verseLearnItems.ownerId],
+      references: [users.id],
+    }),
+    book: one(bibleBooks, {
+      fields: [verseLearnItems.bookId],
+      references: [bibleBooks.id],
+    }),
+    translation: one(bibleTranslations, {
+      fields: [verseLearnItems.translationId],
+      references: [bibleTranslations.id],
+    }),
+    audio: one(verseAudio, {
+      fields: [verseLearnItems.id],
+      references: [verseAudio.verseId],
+    }),
   }),
-  book: one(bibleBooks, {
-    fields: [verseLearnItems.bookId],
-    references: [bibleBooks.id],
-  }),
-  translation: one(bibleTranslations, {
-    fields: [verseLearnItems.translationId],
-    references: [bibleTranslations.id],
+);
+
+export const verseAudioRelations = relations(verseAudio, ({ one }) => ({
+  verse: one(verseLearnItems, {
+    fields: [verseAudio.verseId],
+    references: [verseLearnItems.id],
   }),
 }));
 
@@ -708,6 +754,8 @@ export type NewTask = typeof tasks.$inferInsert;
 export type TaskAnswer = typeof taskAnswers.$inferSelect;
 
 export type VerseLearnItem = typeof verseLearnItems.$inferSelect;
+export type NewVerseLearnItem = typeof verseLearnItems.$inferInsert;
+export type VerseAudio = typeof verseAudio.$inferSelect;
 export type BibleBook = typeof bibleBooks.$inferSelect;
 export type BibleTranslation = typeof bibleTranslations.$inferSelect;
 
